@@ -3097,3 +3097,68 @@ class Database:
             return True
         except sqlite3.IntegrityError:
             return False
+
+    def initialize_web_search_schema(self) -> None:
+        schema = """
+        CREATE TABLE IF NOT EXISTS web_search_jobs (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            status TEXT NOT NULL,
+            request_json TEXT NOT NULL,
+            markets_count INTEGER NOT NULL,
+            results_count INTEGER NOT NULL DEFAULT 0,
+            warnings_json TEXT NOT NULL DEFAULT '[]',
+            errors_json TEXT NOT NULL DEFAULT '[]'
+        );
+
+        CREATE TABLE IF NOT EXISTS web_search_market_runs (
+            id INTEGER PRIMARY KEY,
+            job_id TEXT NOT NULL REFERENCES web_search_jobs(id) ON DELETE CASCADE,
+            market TEXT NOT NULL,
+            source TEXT,
+            status TEXT NOT NULL,
+            candidates_returned INTEGER NOT NULL DEFAULT 0,
+            results_count INTEGER NOT NULL DEFAULT 0,
+            warning TEXT,
+            error TEXT,
+            started_at TEXT,
+            finished_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS web_search_results (
+            id INTEGER PRIMARY KEY,
+            job_id TEXT NOT NULL REFERENCES web_search_jobs(id) ON DELETE CASCADE,
+            market TEXT NOT NULL,
+            source TEXT NOT NULL,
+            source_document_id TEXT,
+            published_at TEXT,
+            period_end_date TEXT,
+            reporting_year INTEGER,
+            document_type TEXT NOT NULL,
+            classification TEXT,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            issuer_name TEXT,
+            issuer_isin TEXT,
+            issuer_lei TEXT,
+            category TEXT,
+            file_format TEXT,
+            date_confidence TEXT,
+            source_publication_date_raw TEXT,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_web_search_results_job
+            ON web_search_results(job_id);
+        CREATE INDEX IF NOT EXISTS idx_web_search_results_type
+            ON web_search_results(document_type);
+        CREATE INDEX IF NOT EXISTS idx_web_search_results_market
+            ON web_search_results(market);
+        CREATE INDEX IF NOT EXISTS idx_web_search_results_url
+            ON web_search_results(url);
+        """
+        with self.connect() as connection:
+            connection.executescript(schema)

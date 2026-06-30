@@ -16,6 +16,8 @@ métadonnées des sources officielles.
   `Euronext Growth Dublin` et `Global Exchange Market`;
 - stockage SQLite des émetteurs, documents et runs;
 - watcher quotidien idempotent avec historique `watch_runs`;
+- découverte source-first de liens de documents financiers par marché et par
+  période, sans téléchargement serveur des fichiers;
 - connecteur France Info-financière/OpenDataSoft Explore API 2.1;
 - connecteur Oslo Euronext Live / NewsWeb avec découverte runtime;
 - connecteur Italie EMARKET STORAGE avec 1INFO en fallback de découverte;
@@ -235,6 +237,81 @@ python main.py import-csv euronext_companies.csv
 
 Le fichier peut contenir des lignes de métadonnées après l'en-tête: toute
 ligne sans ISIN valide est ignorée.
+
+## Recherche de liens sans téléchargement
+
+Le mode `discover-market-documents` interroge les sources officielles en
+source-first et exporte uniquement les liens vers les documents. Il ne
+télécharge pas les PDF, XHTML, XML ou ZIP: l'utilisateur ouvre ou télécharge
+ensuite le document depuis sa source officielle.
+
+Recherche sur une place:
+
+```powershell
+python main.py discover-market-documents --market "Euronext Paris" --date-from 2026-01-01 --date-to 2026-06-30 --format csv
+```
+
+Recherche sur toutes les places supportées:
+
+```powershell
+python main.py discover-market-documents --all --date-from 2026-01-01 --date-to 2026-06-30 --format json --dedupe-url
+```
+
+Les exports sont écrits par défaut dans `exports/` avec les colonnes marché,
+source, identifiant source, date de publication, période, exercice, type de
+document, classification, titre, URL, émetteur, ISIN, LEI, catégorie source et
+confiance de date.
+
+La CLI et la webapp partagent le même service `DocumentSearchService` dans
+`webapp/services/document_search.py`.
+
+## Webapp de recherche
+
+La webapp locale permet de lancer des recherches multi-marchés, de suivre la
+progression par place, de filtrer les résultats et d'exporter des liens
+officiels sans téléchargement serveur.
+
+Lancer la webapp:
+
+```powershell
+python main.py serve
+python main.py serve --host 127.0.0.1 --port 8000
+```
+
+Alternative directe avec Uvicorn:
+
+```powershell
+python -m uvicorn webapp.app:create_app --factory --reload --host 127.0.0.1 --port 8000
+```
+
+Variables d'environnement web (voir aussi `.env.example`):
+
+```dotenv
+INFOFIN_WEB_HOST=127.0.0.1
+INFOFIN_WEB_PORT=8000
+INFOFIN_WEB_WORKERS=2
+INFOFIN_WEB_MAX_PERIOD_DAYS=370
+INFOFIN_WEB_MAX_CANDIDATES=100000
+```
+
+Purge des recherches web anciennes:
+
+```powershell
+python main.py purge-web-searches --older-than-days 30
+```
+
+Documentation de conception:
+
+- [`ARCHITECTURE_WEBAPP.md`](ARCHITECTURE_WEBAPP.md): architecture, modules,
+  modèle de données, API, UI et critères MVP;
+- [`PLAN_DEVELOPPEMENT_WEBAPP.md`](PLAN_DEVELOPPEMENT_WEBAPP.md): plan de
+  développement détaillé, lots d'implémentation et tests.
+
+La cible est une application locale FastAPI + Jinja2/HTMX qui lance des jobs
+de recherche, affiche la progression par marché, permet de filtrer les liens
+par type de document, période, source, texte libre, ISIN et format, puis
+exporte les résultats en CSV ou JSON. Le téléchargement des documents reste à
+la charge de l'utilisateur via les liens officiels affichés.
 
 ## Daily operations / troubleshooting
 

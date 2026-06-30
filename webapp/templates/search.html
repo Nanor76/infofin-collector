@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block title %}Recherche — InfoFin{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Recherche de documents financiers</h1>
+  <form id="search-form" class="search-form">
+    <div class="field">
+      <label for="markets">Marchés</label>
+      <select id="markets" name="markets" multiple required size="8">
+        {% for market in markets %}
+        <option value="{{ market }}">{{ market }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="date_from">Date début</label>
+        <input type="date" id="date_from" name="date_from" required>
+      </div>
+      <div class="field">
+        <label for="date_to">Date fin</label>
+        <input type="date" id="date_to" name="date_to" required>
+      </div>
+    </div>
+    <fieldset class="field">
+      <legend>Types de documents</legend>
+      <div class="checkbox-grid">
+        {% for value, label in document_types %}
+        <label><input type="checkbox" name="document_types" value="{{ value }}"> {{ label }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="field-row">
+      <div class="field">
+        <label for="query">Texte libre</label>
+        <input type="text" id="query" name="query" placeholder="émetteur, titre, ISIN…">
+      </div>
+      <div class="field">
+        <label for="issuer_isin">ISIN</label>
+        <input type="text" id="issuer_isin" name="issuer_isin" placeholder="FR0000000001">
+      </div>
+    </div>
+    <label class="checkbox-inline">
+      <input type="checkbox" id="dedupe_url" name="dedupe_url">
+      Dédupliquer par URL
+    </label>
+    <button type="submit" class="btn-primary">Lancer la recherche</button>
+  </form>
+</section>
+{% endblock %}

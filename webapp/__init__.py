@@ -1,0 +1,1 @@
+"""Webapp de recherche de documents financiers."""

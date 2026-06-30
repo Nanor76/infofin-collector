@@ -1,0 +1,64 @@
+<div class="results-meta">
+  <span>{{ total }} résultat(s) — page {{ page }}/{{ total_pages }}</span>
+</div>
+<table class="results-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Marché</th>
+      <th>Émetteur</th>
+      <th>ISIN</th>
+      <th>Type</th>
+      <th>Titre</th>
+      <th>Source</th>
+      <th>Catégorie</th>
+      <th>Format</th>
+      <th>Confiance</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in results %}
+    <tr>
+      <td>{{ row.get("published_at") or "" }}</td>
+      <td>{{ row.get("market") or "" }}</td>
+      <td>{{ row.get("issuer_name") or "" }}</td>
+      <td>{{ row.get("issuer_isin") or "" }}</td>
+      <td><span class="badge">{{ row.get("document_type") or "" }}</span></td>
+      <td class="title-cell">{{ row.get("title") or "" }}</td>
+      <td>{{ row.get("source") or "" }}</td>
+      <td>{{ row.get("category") or "" }}</td>
+      <td>{{ row.get("file_format") or "" }}</td>
+      <td>{{ row.get("date_confidence") or "" }}</td>
+      <td class="actions">
+        <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
+        <button type="button" class="copy-link" data-url="{{ row.get('url') or '' }}">Copier</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="11" class="empty">Aucun résultat</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if total_pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <button
+    type="button"
+    hx-get="/partials/searches/{{ job_id }}/results?page={{ page - 1 }}&document_type={{ filters.document_type }}&market={{ filters.market }}&source={{ filters.source }}&q={{ filters.q }}&issuer_isin={{ filters.issuer_isin }}&sort={{ filters.sort }}"
+    hx-target="#results-table"
+    hx-swap="innerHTML"
+  >Précédent</button>
+  {% endif %}
+  {% if page < total_pages %}
+  <button
+    type="button"
+    hx-get="/partials/searches/{{ job_id }}/results?page={{ page + 1 }}&document_type={{ filters.document_type }}&market={{ filters.market }}&source={{ filters.source }}&q={{ filters.q }}&issuer_isin={{ filters.issuer_isin }}&sort={{ filters.sort }}"
+    hx-target="#results-table"
+    hx-swap="innerHTML"
+  >Suivant</button>
+  {% endif %}
+</nav>
+{% endif %}

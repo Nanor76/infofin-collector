@@ -4,9 +4,13 @@ import argparse
 import csv
 import json
 import logging
+import os
 import sqlite3
+import subprocess
 import sys
+import threading
 import unicodedata
+import webbrowser
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -119,6 +123,31 @@ def positive_int(value: str) -> int:
     if parsed < 1:
         raise argparse.ArgumentTypeError("la valeur doit être supérieure à 0")
     return parsed
+
+
+def _browser_url(host: str, port: int) -> str:
+    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    return f"http://{browser_host}:{port}/"
+
+
+def _open_chrome(url: str) -> None:
+    chrome_paths = (
+        Path(os.environ.get("PROGRAMFILES", ""))
+        / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", ""))
+        / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", ""))
+        / "Google/Chrome/Application/chrome.exe",
+    )
+    for chrome_path in chrome_paths:
+        if chrome_path.is_file():
+            subprocess.Popen(
+                [str(chrome_path), url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+    webbrowser.open(url)
 
 
 def configure_logging(level: str) -> None:
@@ -305,6 +334,38 @@ def build_parser() -> argparse.ArgumentParser:
             "Déduplique globalement les URLs et agrège les places dans la "
             "colonne market."
         ),
+    )
+
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="Lance la webapp locale de recherche de documents.",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default=None,
+        help="Adresse d'écoute (défaut: INFOFIN_WEB_HOST ou 127.0.0.1).",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=positive_int,
+        default=None,
+        help="Port d'écoute (défaut: INFOFIN_WEB_PORT ou 8765).",
+    )
+    serve_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Ne pas ouvrir Chrome automatiquement au démarrage.",
+    )
+
+    purge_web_parser = subparsers.add_parser(
+        "purge-web-searches",
+        help="Supprime les recherches web plus anciennes qu'un seuil.",
+    )
+    purge_web_parser.add_argument(
+        "--older-than-days",
+        type=positive_int,
+        required=True,
+        help="Supprime les jobs créés avant ce nombre de jours.",
     )
 
     check_parser = subparsers.add_parser(
@@ -730,188 +791,37 @@ def discover_market_document_links(
     session_factory: Callable[..., object] = build_http_session,
     connector_factory: Callable[..., Connector | None] = connector_for_market,
 ) -> MarketDocumentLinksExport:
-    if date_from > date_to:
-        raise ValueError("--date-from doit être inférieur ou égal à --date-to")
+    from webapp.services.document_search import (
+        DocumentSearchService,
+        LinkSearchRequest,
+    )
+    from webapp.services.exports import write_search_export
+
     if output_format not in {"csv", "json"}:
         raise ValueError("format attendu: csv ou json")
 
-    session = session_factory(
-        retries=settings.http_retries,
-        backoff_factor=settings.http_backoff_factor,
-        user_agent=settings.user_agent,
-        verify=settings.http_verify_ssl,
+    request = LinkSearchRequest(
+        markets=markets,
+        date_from=date_from,
+        date_to=date_to,
+        max_candidates=max_candidates,
+        dedupe_url=dedupe_url,
     )
-    rows: list[dict[str, object]] = []
-    errors: list[str] = []
-    warnings: list[str] = []
-    market_summaries: list[dict[str, object]] = []
-    try:
-        for market in markets:
-            normalized_market = normalize_market(market)
-            connector = connector_factory(
-                normalized_market,
-                settings=settings,
-                session=session,
-            )
-            if connector is None:
-                errors.append(f"{normalized_market}: aucun connecteur")
-                market_summaries.append(
-                    {
-                        "market": normalized_market,
-                        "source": "",
-                        "status": "error",
-                        "candidates_returned": 0,
-                        "documents_count": 0,
-                        "warning": "",
-                        "error": "aucun connecteur",
-                    }
-                )
-                continue
-            if not getattr(connector, "supports_source_first", False):
-                message = "source-first non supporté"
-                errors.append(f"{normalized_market}: {message}")
-                market_summaries.append(
-                    {
-                        "market": normalized_market,
-                        "source": getattr(connector, "source_name", ""),
-                        "status": "error",
-                        "candidates_returned": 0,
-                        "documents_count": 0,
-                        "warning": "",
-                        "error": message,
-                    }
-                )
-                continue
-
-            try:
-                candidates = connector.search_recent_documents(
-                    normalized_market,
-                    since=date_from,
-                    limit=max_candidates,
-                )
-            except Exception as exc:
-                errors.append(f"{normalized_market}: {exc}")
-                market_summaries.append(
-                    {
-                        "market": normalized_market,
-                        "source": getattr(connector, "source_name", ""),
-                        "status": "error",
-                        "candidates_returned": 0,
-                        "documents_count": 0,
-                        "warning": "",
-                        "error": str(exc),
-                    }
-                )
-                continue
-
-            unique: dict[tuple[str, str], DocumentCandidate] = {}
-            for candidate in candidates:
-                publication_date = _document_publication_date(candidate)
-                if publication_date is None:
-                    continue
-                if publication_date < date_from or publication_date > date_to:
-                    continue
-                key = (
-                    candidate.source,
-                    candidate.source_document_id or candidate.url,
-                )
-                unique.setdefault(key, candidate)
-
-            market_rows = [
-                _document_link_row(normalized_market, candidate)
-                for candidate in sorted(
-                    unique.values(),
-                    key=lambda item: (
-                        _document_publication_date(item) or date.min,
-                        item.source,
-                        item.title.casefold(),
-                        item.url,
-                    ),
-                    reverse=True,
-                )
-            ]
-            rows.extend(market_rows)
-            warning = ""
-            if len(candidates) >= max_candidates:
-                warning = (
-                    "le nombre de candidats retournés atteint "
-                    f"--max-candidates={max_candidates}; augmenter ce plafond "
-                    "pour prouver l'exhaustivité sur cette période"
-                )
-                warnings.append(f"{normalized_market}: {warning}")
-            market_summaries.append(
-                {
-                    "market": normalized_market,
-                    "source": getattr(connector, "source_name", ""),
-                    "status": "ok",
-                    "candidates_returned": len(candidates),
-                    "documents_count": len(market_rows),
-                    "warning": warning,
-                    "error": "",
-                }
-            )
-
-        if dedupe_url:
-            rows = _dedupe_document_link_rows_by_url(rows)
-    finally:
-        close = getattr(session, "close", None)
-        if callable(close):
-            close()
-
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    scope = "all" if len(markets) != 1 else _market_output_slug(markets[0])
-    target = (
-        output_path
-        / (
-            f"market_documents_{scope}_{date_from:%Y%m%d}_"
-            f"{date_to:%Y%m%d}.{output_format}"
-        )
+    result_set = DocumentSearchService(
+        settings,
+        session_factory=session_factory,
+        connector_factory=connector_factory,
+    ).search_links(request)
+    target = write_search_export(
+        result_set,
+        output_format=output_format,
+        output_dir=output_dir,
     )
-    if output_format == "json":
-        payload = {
-            "date_from": date_from.isoformat(),
-            "date_to": date_to.isoformat(),
-            "markets": [normalize_market(market) for market in markets],
-            "documents_count": len(rows),
-            "errors": errors,
-            "warnings": warnings,
-            "market_summaries": market_summaries,
-            "documents": rows,
-        }
-        target.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, default=str),
-            encoding="utf-8",
-        )
-    else:
-        fieldnames = [
-            "market",
-            "source",
-            "source_document_id",
-            "published_at",
-            "period_end_date",
-            "reporting_year",
-            "document_type",
-            "classification",
-            "title",
-            "url",
-            "issuer_name",
-            "issuer_isin",
-            "issuer_lei",
-            "category",
-            "date_confidence",
-            "source_publication_date_raw",
-        ]
-        with target.open("w", newline="", encoding="utf-8-sig") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
-
     return MarketDocumentLinksExport(
         output_path=target,
-        documents_count=len(rows),
-        errors=tuple(errors),
-        warnings=tuple(warnings),
+        documents_count=len(result_set.documents),
+        errors=result_set.errors,
+        warnings=result_set.warnings,
     )
 
 
@@ -4108,6 +4018,51 @@ def main(argv: list[str] | None = None) -> int:
             for error in export.errors:
                 print(f"ERREUR {error}", file=sys.stderr)
             return 1 if export.errors else 0
+        if args.command == "serve":
+            import uvicorn
+
+            host = args.host or settings.web_host
+            port = args.port or settings.web_port
+            url = _browser_url(host, port)
+            print(f"Webapp InfoFin: {url}", file=sys.stderr)
+            if not args.no_open:
+                threading.Timer(1.0, _open_chrome, args=(url,)).start()
+            try:
+                uvicorn.run(
+                    "webapp.app:create_app",
+                    factory=True,
+                    host=host,
+                    port=port,
+                )
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 10048 or exc.errno in {
+                    48,
+                    98,
+                    10048,
+                }:
+                    print(
+                        f"ERREUR: le port {port} est déjà utilisé par une autre "
+                        f"application.\n"
+                        f"Relancez avec un autre port, par exemple:\n"
+                        f"  python main.py serve --port 8766",
+                        file=sys.stderr,
+                    )
+                    return 1
+                raise
+            return 0
+        if args.command == "purge-web-searches":
+            from datetime import timedelta
+
+            from webapp.repositories import WebSearchRepository
+
+            database = Database(settings.db_path)
+            database.initialize_web_search_schema()
+            cutoff = (
+                datetime.now(UTC) - timedelta(days=args.older_than_days)
+            ).isoformat(timespec="seconds")
+            deleted = WebSearchRepository(database).purge_jobs_older_than(cutoff)
+            print(f"{deleted} recherche(s) web supprimée(s)")
+            return 0
 
         database = Database(settings.db_path)
         database.initialize()

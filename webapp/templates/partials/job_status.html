@@ -1,0 +1,45 @@
+<div class="job-status status-{{ status.status }}">
+  <p><strong>Statut :</strong> {{ status.status }} — {{ status.results_count }} résultat(s)</p>
+  {% if status.warnings %}
+  <div class="alerts warnings">
+    {% for warning in status.warnings %}
+    <p>{{ warning }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if status.errors %}
+  <div class="alerts errors">
+    {% for error in status.errors %}
+    <p>{{ error }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if status.markets %}
+  <table class="market-runs">
+    <thead>
+      <tr>
+        <th>Marché</th>
+        <th>Source</th>
+        <th>Statut</th>
+        <th>Candidats</th>
+        <th>Résultats</th>
+        <th>Avertissement</th>
+        <th>Erreur</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in status.markets %}
+      <tr>
+        <td>{{ run.market }}</td>
+        <td>{{ run.source or "" }}</td>
+        <td><span class="badge">{{ run.status }}</span></td>
+        <td>{{ run.candidates_returned }}</td>
+        <td>{{ run.results_count }}</td>
+        <td>{{ run.warning or "" }}</td>
+        <td>{{ run.error or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>

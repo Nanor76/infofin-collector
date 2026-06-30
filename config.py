@@ -200,9 +200,11 @@ class Settings:
     malta_mse_oam_lookback_days: int = 365
     malta_mse_oam_rate_limit_seconds: float = 0.5
     malta_mse_oam_verify_ssl: bool = True
-
-
-
+    web_host: str = "127.0.0.1"
+    web_port: int = 8765
+    web_workers: int = 2
+    web_max_period_days: int = 370
+    web_max_candidates: int = 100000
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -659,4 +661,9 @@ class Settings:
             malta_mse_oam_verify_ssl=os.getenv(
                 "MALTA_MSE_OAM_VERIFY_SSL", "true"
             ).lower() != "false",
+            web_host=os.getenv("INFOFIN_WEB_HOST", "127.0.0.1"),
+            web_port=_env_int("INFOFIN_WEB_PORT", 8765),
+            web_workers=_env_int("INFOFIN_WEB_WORKERS", 2),
+            web_max_period_days=_env_int("INFOFIN_WEB_MAX_PERIOD_DAYS", 370),
+            web_max_candidates=_env_int("INFOFIN_WEB_MAX_CANDIDATES", 100000),
         )
