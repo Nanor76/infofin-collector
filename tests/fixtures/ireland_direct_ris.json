@@ -1,0 +1,22 @@
+{
+  "records": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "companyName": "BANK OF IRELAND GROUP PLC",
+      "headLine": "Full Year Results & Strategy Update 2025",
+      "releaseDate": "2026-03-02T08:51:35+01:00",
+      "newsId": null,
+      "documents": [
+        {
+          "id": "fixture-ris-pdf-id",
+          "folderUrl": null,
+          "name": "ANN151759.pdf"
+        }
+      ],
+      "relatedAnnouncements": []
+    }
+  ],
+  "totalItems": 1,
+  "currentPage": 0,
+  "numberOfPages": 1
+}

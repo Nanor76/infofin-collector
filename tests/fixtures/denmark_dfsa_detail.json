@@ -1,0 +1,96 @@
+{
+  "heading": "Matas Group - Annual Report 2025/26",
+  "sections": [
+    {
+      "heading": "Notification",
+      "elements": [
+        {
+          "type": "keyvalue",
+          "key": {"name": "Announcement ID", "tooltip": ""},
+          "value": {"type": "text", "value": "300009086", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "Type", "tooltip": ""},
+          "value": {"type": "text", "value": "Issuer", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "", "tooltip": ""},
+          "value": {"type": "text", "value": "Annual financial report", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "Documents(s)", "tooltip": ""},
+          "value": {
+            "type": "link",
+            "title": "Matas Annual Report 2025 26.pdf (English)",
+            "url": "https://files.test/Matas-Annual-Report-2025-26.pdf"
+          }
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "", "tooltip": ""},
+          "value": {
+            "type": "link",
+            "title": "Matas-2026-03-31-en.xhtml (English)",
+            "url": "https://files.test/Matas-2026-03-31-en.xhtml"
+          }
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "", "tooltip": ""},
+          "value": {
+            "type": "link",
+            "title": "Matas-2026-03-31-en.zip (English)",
+            "url": "https://files.test/Matas-2026-03-31-en.zip"
+          }
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "", "tooltip": ""},
+          "value": {
+            "type": "link",
+            "title": "Release.pdf (English)",
+            "url": "https://files.test/Release.pdf"
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Time",
+      "elements": [
+        {
+          "type": "keyvalue",
+          "key": {"name": "Published", "tooltip": ""},
+          "value": {"type": "text", "value": "19-05-2026 08:00:00", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "Registration time", "tooltip": ""},
+          "value": {"type": "text", "value": "19-05-2026 08:00:12", "tooltip": ""}
+        }
+      ]
+    },
+    {
+      "heading": "Issuer",
+      "elements": [
+        {
+          "type": "keyvalue",
+          "key": {"name": "Company", "tooltip": ""},
+          "value": {"type": "text", "value": "MATAS A/S", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "National business ID", "tooltip": ""},
+          "value": {"type": "text", "value": "27528406", "tooltip": ""}
+        },
+        {
+          "type": "keyvalue",
+          "key": {"name": "LEI code", "tooltip": ""},
+          "value": {"type": "text", "value": "2138004PXX8LWGHGL872", "tooltip": ""}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="sv">
+  <body>
+    <table id="resultsTable">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Emittent</th>
+          <th>Kategori</th>
+          <th>Länkar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Notice 1: Ericsson, with direct PDF and ZIP ESEF files -->
+        <tr data-record-id="rec-ericsson-123">
+          <td class="date">2026-03-15</td>
+          <td class="issuer">Ericsson, Telefonaktiebolaget LM</td>
+          <td class="title">Årsredovisning 2025</td>
+          <td>
+            <a href="http://example.com/download/ericsson_2025.pdf" data-format="pdf" data-filename="ericsson_2025.pdf">PDF</a>
+            <a href="http://example.com/download/ericsson_2025.zip" data-format="zip" data-filename="ericsson_2025.zip">ZIP ESEF</a>
+          </td>
+        </tr>
+        <!-- Notice 2: Volvo, which points to a detail page rather than direct files -->
+        <tr data-record-id="rec-volvo-456">
+          <td class="date">2026-04-20</td>
+          <td class="issuer">Volvo, AB</td>
+          <td class="title">Delårsrapport Q1 2026</td>
+          <td>
+            <a href="/Search/Detail?id=rec-volvo-456" class="detail">Visa detaljer</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

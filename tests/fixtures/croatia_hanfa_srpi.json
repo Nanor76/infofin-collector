@@ -1,0 +1,32 @@
+{
+  "draw": 1,
+  "recordsTotal": 3,
+  "recordsFiltered": 3,
+  "data": [
+    [
+      "2026-06-05 15:25:05",
+      "ĐURO ĐAKOVIĆ GRUPA d.d.",
+      "Annual financial report (art.462. CMA)",
+      "<span>Language: </span> Hrvatski<br/><span>Year: </span> 2025<br/>Consolidated<br/>Audited",
+      "",
+      "<a href=\"/SRPI/HR/2026/2026_06_05-1234447_pdf.pdf\">Annual management report 2025.pdf</a> [PDF]<br/><a href=\"/SRPI/HR/2026/2026_06_05-1234447_xls.xlsx\">worksheet.xlsx</a> [XLS]"
+    ],
+    [
+      "2026-06-05 15:23:06",
+      "ĐURO ĐAKOVIĆ GRUPA d.d.",
+      "Annual financial report (art.462. CMA)",
+      "<span>Year: </span> 2025<br/><span>Correction: </span> Last version 2026-06-05 15:25:05",
+      "",
+      "<a href=\"/SRPI/HR/2026/2026_06_05-1234446_zip.zip\">durodakovicgrupadd-2025-12-31-0-hr.zip</a> [ZIP]"
+    ],
+    [
+      "2026-05-29 09:37:31",
+      "Čakovečki mlinovi d.d.",
+      "Annual financial report (art.462. CMA)",
+      "<span>Language: </span> Engleski<br/><span>Year: </span> 2025<br/>Consolidated<br/>Audited",
+      "",
+      "<a href=\"/SRPI/EN/2026/2026_05_29-1232682_zip.zip\">cakovecki-2025-12-31-en.zip</a> [ZIP]<br/><a href=\"/SRPI/EN/2026/2026_05_29-1232682_pdf.pdf\">Auditor report financial statements 2025.pdf</a> [PDF]"
+    ]
+  ],
+  "error": null
+}

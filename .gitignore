@@ -1,0 +1,42 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.pytest_tmp/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Runtime data and generated outputs
+data/
+exports/
+reports/
+terminals/
+*.sqlite
+*.sqlite3
+*.db
+
+# Local experiments / old scraping attempts
+scratch/
+agent-tools/
+Arelle/
+DOM_euronext/
+dom/
+dom_2024/
+euronext_scraper/
+pytest_local*/
+temp_pytest/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

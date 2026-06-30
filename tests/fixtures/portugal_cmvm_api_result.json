@@ -1,0 +1,33 @@
+{
+  "versionInfo": {
+    "hasModuleVersionChanged": false,
+    "hasApiVersionChanged": false
+  },
+  "data": {
+    "InfPeriodicasContAnuaisLst2": {
+      "List": [
+        {
+          "ID": 1383791,
+          "Time": "18:11",
+          "DATA_FACT": "2026-05-04",
+          "DSC_FACT": "ALTRI, S.G.P.S., S.A. informa sobre Relatório e Contas do exercício de 2025 - versão não conforme com ESEF",
+          "PDF_FACT": "PC1287091.pdf",
+          "IsZip": false,
+          "IsEN": false,
+          "EncryptedURL": "https://www.cmvm.pt/PInstitucional/PdfViewerInfPriv?Input=A1B2C3D4"
+        },
+        {
+          "ID": 1355962,
+          "Time": "18:10",
+          "DATA_FACT": "2026-05-04",
+          "DSC_FACT": "ALTRI, S.G.P.S., S.A. informa sobre Relatório e Contas do exercício de 2025 aprovado na AGA - versão ESEF",
+          "PDF_FACT": "PCE1287090",
+          "IsZip": true,
+          "IsEN": false,
+          "EncryptedURL": "https://www.cmvm.pt/PInstitucional/EsefViewer?Input=E5EFA123"
+        }
+      ]
+    },
+    "Count": 2
+  }
+}

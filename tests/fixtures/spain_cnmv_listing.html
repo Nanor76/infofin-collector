@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <body>
+    <!-- Notice 1: Mocked with data attributes, representing an annual report with PDF and ZIP -->
+    <tr class="cnmv-row" data-record-id="202612345"
+        data-issuer="Banco Santander, S.A."
+        data-nif="A39000013"
+        data-isin="ES0113900J37"
+        data-title="Informe financiero anual 2025"
+        data-document-type="annual_financial_report"
+        data-date="2026-04-30">
+      <td>Banco Santander, S.A. (ES0113900J37)</td>
+      <td>
+        <a href="http://example.com/download/ES0113900J37_2025.pdf" data-format="pdf">PDF</a>
+        <a href="http://example.com/download/ES0113900J37_2025.zip" data-format="zip">ZIP ESEF</a>
+      </td>
+    </tr>
+    <!-- Notice 2: Fallback parsing using standard HTML tags (tr/td/time/links) -->
+    <tr>
+      <td class="emisor">Telefonica S.A.</td>
+      <td class="fecha">2026-05-15</td>
+      <td class="titulo">Cuentas anuales e informe de gestion 2025 (ES0178430E18)</td>
+      <td>
+        <a href="/portal/consultas/EE/Detalle.aspx?id=2026999" class="detalle">Ver detalle</a>
+        <a href="/download/report.xhtml">XHTML/FEUE</a>
+      </td>
+    </tr>
+  </body>
+</html>

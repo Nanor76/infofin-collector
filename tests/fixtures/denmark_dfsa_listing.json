@@ -1,0 +1,29 @@
+{
+  "paging": {
+    "page": 1,
+    "pageSize": 25,
+    "totalCount": 2,
+    "totalPages": 1
+  },
+  "data": {
+    "type": "table",
+    "rows": [
+      {
+        "id": "300009086",
+        "HeadlineColumn": "Matas Group - Annual Report 2025/26",
+        "IssuerColumn": "MATAS A/S",
+        "CategoryColumn": "Issuer",
+        "PublicationDateColumn": "19-05-2026 08:00:00",
+        "RegistrationDateColumn": "19-05-2026 08:00:12"
+      },
+      {
+        "id": "300009087",
+        "HeadlineColumn": "Major holding notification",
+        "IssuerColumn": "MATAS A/S",
+        "CategoryColumn": "Issuer",
+        "PublicationDateColumn": "20-05-2026 09:00:00",
+        "RegistrationDateColumn": "20-05-2026 09:00:10"
+      }
+    ]
+  }
+}

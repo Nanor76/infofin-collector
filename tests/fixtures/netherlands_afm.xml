@@ -1,0 +1,22 @@
+<register name="financiele-verslaggeving">
+  <vermelding>
+    <id>A2510-03545</id>
+    <datum>3/23/2026 7:20:37 PM</datum>
+    <uitgevende-instelling>Aalberts N.V.</uitgevende-instelling>
+    <boekjaar>2025</boekjaar>
+    <filename>549300EMP9DT6Q35HZ31-2025-12-31-1-en-A2510-03545.zip</filename>
+    <objecttype>Jaarlijkse financiële verslaggeving</objecttype>
+    <objecttype_eng>Annual financial report</objecttype_eng>
+    <vermelding>Aalberts N.V., Jaarlijkse financiële verslaggeving</vermelding>
+  </vermelding>
+  <vermelding>
+    <id>A2510-03453</id>
+    <datum>3/25/2026 11:00:15 AM</datum>
+    <uitgevende-instelling>AFC Ajax N.V.</uitgevende-instelling>
+    <boekjaar>2025</boekjaar>
+    <filename>Halfjaarlijkse-financiele-verslaglegging-A2510-03453.pdf</filename>
+    <objecttype>Halfjaarlijkse financiële verslaggeving</objecttype>
+    <objecttype_eng>Half-yearly financial report</objecttype_eng>
+    <vermelding>AFC Ajax N.V., Halfjaarlijkse financiële verslaggeving</vermelding>
+  </vermelding>
+</register>

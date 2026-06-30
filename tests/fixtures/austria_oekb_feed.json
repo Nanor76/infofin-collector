@@ -1,0 +1,155 @@
+{
+  "anzahlTreffer": 5,
+  "dokumente": [
+    {
+      "id": 249355,
+      "emittent": {
+        "id": 1041,
+        "name": "AT & S Austria Technologie & Systemtechnik Aktiengesellschaft",
+        "lei": "529900EVOKN4LCCD9321",
+        "aktiv": true,
+        "ort": "Leoben"
+      },
+      "titel": "Release of an annual financial report",
+      "kurzbeschreibung": "Annual report",
+      "enKurzbeschreibung": null,
+      "meldetypCode": "EP_JFB_XBRL",
+      "sprachcode": "EN",
+      "uploadzeitpunkt": 1781206767241,
+      "status": "VEROEFFENTLICHT",
+      "von": null,
+      "bis": null,
+      "isinBezug": ["AT0000969985"],
+      "dateien": [
+        {
+          "id": 249354,
+          "dateiname": "ats-2026-03-31-en.zip",
+          "isinBezug": null,
+          "type": null,
+          "sprachcode": "EN",
+          "sizeInKB": 9228530
+        }
+      ]
+    },
+    {
+      "id": 249312,
+      "emittent": {
+        "id": 1041,
+        "name": "AT & S Austria Technologie & Systemtechnik Aktiengesellschaft",
+        "lei": "529900EVOKN4LCCD9321",
+        "aktiv": true,
+        "ort": "Leoben"
+      },
+      "titel": "Release of an annual financial report",
+      "kurzbeschreibung": "Annual report",
+      "enKurzbeschreibung": null,
+      "meldetypCode": "EP_JFB",
+      "sprachcode": "EN",
+      "uploadzeitpunkt": 1781159452603,
+      "status": "VEROEFFENTLICHT",
+      "von": null,
+      "bis": null,
+      "isinBezug": ["AT0000969985"],
+      "dateien": [
+        {
+          "id": 249311,
+          "dateiname": "ATS_Annual-Financial-Report_2025-26.pdf",
+          "isinBezug": null,
+          "type": null,
+          "sprachcode": "EN",
+          "sizeInKB": 9945308
+        }
+      ]
+    },
+    {
+      "id": 248989,
+      "emittent": {
+        "id": 24,
+        "name": "EVN AG",
+        "lei": "5299005A4CSEVQZ0NX77",
+        "aktiv": true,
+        "ort": "Maria Enzersdorf"
+      },
+      "titel": "Release of a half-yearly financial report",
+      "kurzbeschreibung": "Half-year report",
+      "enKurzbeschreibung": null,
+      "meldetypCode": "EP_HJFB",
+      "sprachcode": "EN",
+      "uploadzeitpunkt": 1779946262723,
+      "status": "VEROEFFENTLICHT",
+      "von": null,
+      "bis": null,
+      "isinBezug": ["AT0000741053"],
+      "dateien": [
+        {
+          "id": 248988,
+          "dateiname": "AB_HY1_2025_26_EN.pdf",
+          "isinBezug": null,
+          "type": null,
+          "sprachcode": "EN",
+          "sizeInKB": 2000000
+        }
+      ]
+    },
+    {
+      "id": 248985,
+      "emittent": {
+        "id": 2000,
+        "name": "Example Quarterly AG",
+        "lei": null,
+        "aktiv": true,
+        "ort": "Wien"
+      },
+      "titel": "Interim Financial Report Q1 2026",
+      "kurzbeschreibung": "Quarterly report",
+      "enKurzbeschreibung": null,
+      "meldetypCode": "EP_QUARTALBER",
+      "sprachcode": "EN",
+      "uploadzeitpunkt": 1779944457865,
+      "status": "VEROEFFENTLICHT",
+      "von": null,
+      "bis": null,
+      "isinBezug": ["AT0000000001"],
+      "dateien": [
+        {
+          "id": 248984,
+          "dateiname": "Q1_2026.pdf",
+          "isinBezug": null,
+          "type": null,
+          "sprachcode": "EN",
+          "sizeInKB": 1000000
+        }
+      ]
+    },
+    {
+      "id": 249400,
+      "emittent": {
+        "id": 1041,
+        "name": "AT & S Austria Technologie & Systemtechnik Aktiengesellschaft",
+        "lei": "529900EVOKN4LCCD9321",
+        "aktiv": true,
+        "ort": "Leoben"
+      },
+      "titel": "Inside information",
+      "kurzbeschreibung": "Ad hoc announcement",
+      "enKurzbeschreibung": null,
+      "meldetypCode": "EP_AD_HOC",
+      "sprachcode": "EN",
+      "uploadzeitpunkt": 1781207000000,
+      "status": "VEROEFFENTLICHT",
+      "von": null,
+      "bis": null,
+      "isinBezug": ["AT0000969985 (Aktie), "],
+      "dateien": [
+        {
+          "id": 249399,
+          "dateiname": "inside-information.pdf",
+          "isinBezug": null,
+          "type": null,
+          "sprachcode": "EN",
+          "sizeInKB": 100000
+        }
+      ]
+    }
+  ]
+}

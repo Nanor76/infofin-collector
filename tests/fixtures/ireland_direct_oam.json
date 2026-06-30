@@ -1,0 +1,70 @@
+{
+  "records": [
+    {
+      "filingDate": "2026-03-19T14:17:27+01:00",
+      "companyName": "BANK OF IRELAND GROUP PLC",
+      "headline": "Bank of Ireland Group plc 2025 Annual Report",
+      "regulatoryCategory": "Annualfinancialandauditreports",
+      "regulatoryCategoryDescription": "Annual financial and audit reports",
+      "publishTime": "2026-03-19T14:17:27+01:00",
+      "isinCodes": [{"code": "IE00BD1RP616"}],
+      "symbol": "BIRG",
+      "previousXHTMLVersions": [],
+      "documents": [
+        {
+          "id": "fixture-pdf-id",
+          "folderUrl": null,
+          "name": "Announcement.pdf"
+        }
+      ]
+    },
+    {
+      "filingDate": "2026-03-02T13:36:00+01:00",
+      "companyName": "BANK OF IRELAND GROUP PLC",
+      "headline": "2025 Annual Report ESEF",
+      "regulatoryCategory": "Annualfinancialandauditreports",
+      "regulatoryCategoryDescription": "Annual financial and audit reports",
+      "publishTime": "2026-03-02T13:36:00+01:00",
+      "documents": [
+        {
+          "id": "fixture-xhtml-id",
+          "folderUrl": null,
+          "name": "ANN151760.xhtml"
+        }
+      ]
+    },
+    {
+      "filingDate": "2026-02-28T09:00:00+01:00",
+      "companyName": "BANK OF IRELAND GROUP PLC",
+      "headline": "2025 Annual Report ESEF XML",
+      "regulatoryCategory": "Annualfinancialandauditreports",
+      "regulatoryCategoryDescription": "Annual financial and audit reports",
+      "publishTime": "2026-02-28T09:00:00+01:00",
+      "documents": [
+        {
+          "id": "fixture-xml-id",
+          "folderUrl": null,
+          "name": "boi-2025.xml"
+        }
+      ]
+    },
+    {
+      "filingDate": "2026-02-28T08:59:00+01:00",
+      "companyName": "BANK OF IRELAND GROUP PLC",
+      "headline": "2025 Annual Report ESEF ZIP",
+      "regulatoryCategory": "Annualfinancialandauditreports",
+      "regulatoryCategoryDescription": "Annual financial and audit reports",
+      "publishTime": "2026-02-28T08:59:00+01:00",
+      "documents": [
+        {
+          "id": "fixture-zip-id",
+          "folderUrl": null,
+          "name": "boi-2025.zip"
+        }
+      ]
+    }
+  ],
+  "totalItems": 54,
+  "currentPage": 0,
+  "numberOfPages": 2
+}

@@ -1,0 +1,51 @@
+{
+  "resultCount": 2,
+  "storiResultItems": [
+    {
+      "requiredReportingTopicId": "record-ab-inbev-2025",
+      "companyName": "AB INBEV",
+      "companyNumber": "0417497106",
+      "nationality": "BE",
+      "reportingTopicName": "Annual financial report",
+      "datePublication": "2026-02-12T07:00:00",
+      "dateReceived": "2026-02-19T12:00:00",
+      "lei": "5493008H3828EMEXB082",
+      "mainDocuments": [
+        {
+          "fileDataId": "file-pdf",
+          "language": "en",
+          "title": "Annual financial report 2025",
+          "originalFileName": "AB-InBev-Annual-Report-2025.pdf",
+          "size": 1200,
+          "fileType": "pdf"
+        },
+        {
+          "fileDataId": "file-xhtml",
+          "language": "en",
+          "title": "ESEF annual financial report 2025",
+          "originalFileName": "5493008H3828EMEXB082-2025-12-31-en.xhtml",
+          "size": 9000,
+          "fileType": "xhtml"
+        },
+        {
+          "fileDataId": "file-zip",
+          "language": "en",
+          "title": "ESEF annual financial report package 2025",
+          "originalFileName": "5493008H3828EMEXB082-2025-12-31-en.zip",
+          "size": 15000,
+          "fileType": "zip"
+        }
+      ],
+      "attachments": [],
+      "isinCodes": [
+        {
+          "code": "BE0974293251",
+          "startDate": "2016-10-10T00:00:00",
+          "isinType": "Shares",
+          "market": "Euronext Brussels"
+        }
+      ],
+      "documentTitle": "Annual financial report 2025"
+    }
+  ]
+}
