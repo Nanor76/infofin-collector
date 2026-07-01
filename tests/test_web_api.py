@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
 from config import Settings
@@ -23,6 +24,8 @@ class FakeJobManager:
     def __init__(self, repository: WebSearchRepository) -> None:
         self.repository = repository
         self.job_id = "fakejob1234567890abcdef1234567890ab"
+        self.running_job_id = "runningjob1234567890abcdef123456789"
+        self.paginated_job_id = "pagejob1234567890abcdef1234567890ab"
         self._seed_job()
 
     def _seed_job(self) -> None:
@@ -70,6 +73,53 @@ class FakeJobManager:
             self.job_id,
             status="done",
             results_count=1,
+            warnings=(),
+            errors=(),
+        )
+        self.repository.create_job(
+            self.running_job_id,
+            LinkSearchRequest(
+                markets=("Euronext Paris",),
+                date_from=date(2026, 6, 1),
+                date_to=date(2026, 6, 30),
+            ),
+        )
+        self.repository.mark_job_running(self.running_job_id)
+        self.repository.create_job(
+            self.paginated_job_id,
+            LinkSearchRequest(
+                markets=("Euronext Paris",),
+                date_from=date(2026, 6, 1),
+                date_to=date(2026, 6, 30),
+            ),
+        )
+        paginated_documents = tuple(
+            LinkSearchDocument(
+                market="Euronext Paris",
+                source="fake-oam",
+                source_document_id=f"doc-page-{index}",
+                published_at=f"2026-06-{(index % 28) + 1:02d}",
+                period_end_date="",
+                reporting_year="",
+                document_type="annual_financial_report",
+                classification="",
+                title=f"Paginated report {index}",
+                url=f"https://official.test/report-{index}.pdf",
+                issuer_name=f"Issuer {index}",
+                issuer_isin=f"FR{index:010d}",
+                issuer_lei="",
+                category="",
+                file_format="pdf",
+                date_confidence="high",
+                source_publication_date_raw="",
+            )
+            for index in range(51)
+        )
+        self.repository.replace_results(self.paginated_job_id, paginated_documents)
+        self.repository.finish_job(
+            self.paginated_job_id,
+            status="done",
+            results_count=len(paginated_documents),
             warnings=(),
             errors=(),
         )
@@ -205,3 +255,57 @@ def test_get_results_page_with_fake_job(client: TestClient) -> None:
     partial = client.get(f"/partials/searches/{job_id}/results")
     assert partial.status_code == 200
     assert 'rel="noopener noreferrer"' in partial.text
+
+
+def test_terminal_results_page_does_not_auto_poll_results(
+    client: TestClient,
+) -> None:
+    job_id = "fakejob1234567890abcdef1234567890ab"
+    response = client.get(f"/searches/{job_id}")
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    status = soup.select_one("#job-status .job-status")
+    results = soup.select_one("#results-table")
+
+    assert status is not None
+    assert status["data-terminal"] == "true"
+    assert results is not None
+    assert not results.has_attr("hx-trigger")
+    assert not results.has_attr("hx-get")
+
+
+def test_running_results_page_polls_with_current_filters(
+    client: TestClient,
+) -> None:
+    job_id = "runningjob1234567890abcdef123456789"
+    response = client.get(f"/searches/{job_id}")
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    status = soup.select_one("#job-status .job-status")
+    results = soup.select_one("#results-table")
+
+    assert status is not None
+    assert status["data-terminal"] == "false"
+    assert results is not None
+    assert results["hx-get"] == f"/partials/searches/{job_id}/results"
+    assert "infofinShouldPollResults()" in results["hx-trigger"]
+    assert results["hx-include"] == "#results-filters"
+
+
+def test_results_pagination_uses_htmx_values_and_form_filters(
+    client: TestClient,
+) -> None:
+    job_id = "pagejob1234567890abcdef1234567890ab"
+    response = client.get(
+        f"/partials/searches/{job_id}/results",
+        params={"page": 1, "page_size": 50},
+    )
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    next_button = soup.select_one(".pagination button")
+
+    assert next_button is not None
+    assert next_button["hx-get"] == f"/partials/searches/{job_id}/results"
+    assert next_button["hx-include"] == "#results-filters"
+    assert '"page": 2' in next_button["hx-vals"]
+    assert "?" not in next_button["hx-get"]

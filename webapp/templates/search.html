@@ -1,50 +1,132 @@
 {% extends "layout.html" %}
 {% block title %}Recherche — InfoFin{% endblock %}
 {% block content %}
-<section class="panel">
-  <h1>Recherche de documents financiers</h1>
+<div class="search-container">
+  <div class="search-hero">
+    <h1>Recherche de documents financiers</h1>
+    <p class="hero-subtitle">Interrogez les bases de données réglementaires et les OAM européens en temps réel.</p>
+  </div>
+
   <form id="search-form" class="search-form">
-    <div class="field">
-      <label for="markets">Marchés</label>
-      <select id="markets" name="markets" multiple required size="8">
+    <!-- Panel 1: Marchés -->
+    <div class="form-card">
+      <div class="card-header">
+        <i data-lucide="globe" class="header-icon"></i>
+        <div>
+          <h2>Marchés cibles</h2>
+          <p class="card-desc">Sélectionnez les marchés réglementés à interroger.</p>
+        </div>
+      </div>
+      
+      <div class="market-grid">
         {% for market in markets %}
-        <option value="{{ market }}">{{ market }}</option>
+        <label class="market-checkbox-card">
+          <input type="checkbox" name="markets" value="{{ market }}">
+          <div class="card-inner">
+            <span class="checkbox-indicator"><i data-lucide="check"></i></span>
+            <span class="market-label">{{ market }}</span>
+          </div>
+        </label>
         {% endfor %}
-      </select>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label for="date_from">Date début</label>
-        <input type="date" id="date_from" name="date_from" required>
-      </div>
-      <div class="field">
-        <label for="date_to">Date fin</label>
-        <input type="date" id="date_to" name="date_to" required>
       </div>
     </div>
-    <fieldset class="field">
-      <legend>Types de documents</legend>
-      <div class="checkbox-grid">
+
+    <!-- Panel 2: Période & Options -->
+    <div class="form-grid-two-columns">
+      <div class="form-card">
+        <div class="card-header">
+          <i data-lucide="calendar" class="header-icon"></i>
+          <div>
+            <h2>Période de publication</h2>
+            <p class="card-desc">Définissez l'intervalle de dates pour la recherche.</p>
+          </div>
+        </div>
+
+        <div class="date-presets">
+          <button type="button" class="btn-preset" data-preset="7">7J</button>
+          <button type="button" class="btn-preset" data-preset="30">30J</button>
+          <button type="button" class="btn-preset" data-preset="90">90J</button>
+          <button type="button" class="btn-preset" data-preset="365">1 An</button>
+          <button type="button" class="btn-preset active" data-preset="custom">Perso</button>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="date_from">Date début</label>
+            <div class="input-with-icon">
+              <i data-lucide="calendar-days" class="input-icon"></i>
+              <input type="date" id="date_from" name="date_from" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="date_to">Date fin</label>
+            <div class="input-with-icon">
+              <i data-lucide="calendar-days" class="input-icon"></i>
+              <input type="date" id="date_to" name="date_to" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header">
+          <i data-lucide="sliders" class="header-icon"></i>
+          <div>
+            <h2>Filtres & Optimisation</h2>
+            <p class="card-desc">Précisez vos critères ou optimisez le traitement.</p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="query">Texte libre</label>
+            <div class="input-with-icon">
+              <i data-lucide="search" class="input-icon"></i>
+              <input type="text" id="query" name="query" placeholder="Émetteur, titre, mots clés…">
+            </div>
+          </div>
+          <div class="field">
+            <label for="issuer_isin">Code ISIN</label>
+            <div class="input-with-icon">
+              <i data-lucide="hash" class="input-icon"></i>
+              <input type="text" id="issuer_isin" name="issuer_isin" placeholder="FR0000123456" maxlength="12">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Panel 3: Types de documents -->
+    <div class="form-card">
+      <div class="card-header">
+        <i data-lucide="file-text" class="header-icon"></i>
+        <div>
+          <h2>Types de documents</h2>
+          <p class="card-desc">Filtrez par typologie de rapports financiers réglementés.</p>
+        </div>
+      </div>
+      
+      <div class="doc-types-grid">
         {% for value, label in document_types %}
-        <label><input type="checkbox" name="document_types" value="{{ value }}"> {{ label }}</label>
+        <label class="doc-checkbox-chip">
+          <input type="checkbox" name="document_types" value="{{ value }}">
+          <span class="chip-content">
+            <i data-lucide="file" class="chip-icon"></i>
+            <span class="chip-label">{{ label }}</span>
+          </span>
+        </label>
         {% endfor %}
       </div>
-    </fieldset>
-    <div class="field-row">
-      <div class="field">
-        <label for="query">Texte libre</label>
-        <input type="text" id="query" name="query" placeholder="émetteur, titre, ISIN…">
-      </div>
-      <div class="field">
-        <label for="issuer_isin">ISIN</label>
-        <input type="text" id="issuer_isin" name="issuer_isin" placeholder="FR0000000001">
-      </div>
     </div>
-    <label class="checkbox-inline">
-      <input type="checkbox" id="dedupe_url" name="dedupe_url">
-      Dédupliquer par URL
-    </label>
-    <button type="submit" class="btn-primary">Lancer la recherche</button>
+
+    <!-- Actions -->
+    <div class="form-actions">
+      <button type="submit" class="btn-primary btn-large btn-glow">
+        <i data-lucide="play-circle"></i>
+        <span>Lancer la recherche en temps réel</span>
+      </button>
+    </div>
   </form>
-</section>
+</div>
 {% endblock %}

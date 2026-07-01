@@ -1,64 +1,238 @@
 <div class="results-meta">
-  <span>{{ total }} résultat(s) — page {{ page }}/{{ total_pages }}</span>
+  <div class="meta-left">
+    <i data-lucide="database" class="meta-icon"></i>
+    <span><strong>{{ total }}</strong> document(s) correspondant aux filtres</span>
+  </div>
+  <div class="meta-right">
+    <span>Page <strong>{{ page }}</strong> sur <strong>{{ total_pages }}</strong></span>
+  </div>
 </div>
-<table class="results-table">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Marché</th>
-      <th>Émetteur</th>
-      <th>ISIN</th>
-      <th>Type</th>
-      <th>Titre</th>
-      <th>Source</th>
-      <th>Catégorie</th>
-      <th>Format</th>
-      <th>Confiance</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in results %}
-    <tr>
-      <td>{{ row.get("published_at") or "" }}</td>
-      <td>{{ row.get("market") or "" }}</td>
-      <td>{{ row.get("issuer_name") or "" }}</td>
-      <td>{{ row.get("issuer_isin") or "" }}</td>
-      <td><span class="badge">{{ row.get("document_type") or "" }}</span></td>
-      <td class="title-cell">{{ row.get("title") or "" }}</td>
-      <td>{{ row.get("source") or "" }}</td>
-      <td>{{ row.get("category") or "" }}</td>
-      <td>{{ row.get("file_format") or "" }}</td>
-      <td>{{ row.get("date_confidence") or "" }}</td>
-      <td class="actions">
-        <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
-        <button type="button" class="copy-link" data-url="{{ row.get('url') or '' }}">Copier</button>
-      </td>
-    </tr>
-    {% else %}
-    <tr>
-      <td colspan="11" class="empty">Aucun résultat</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<div class="table-scroll-container">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <!-- Date column -->
+        {% set cur_sort = (filters.sort if filters else '-published_at') or '-published_at' %}
+        {% if cur_sort == 'published_at' %}
+          {% set next_sort, sort_icon = '-published_at', 'arrow-up' %}
+        {% elif cur_sort == '-published_at' %}
+          {% set next_sort, sort_icon = 'published_at', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = '-published_at', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par date"
+        >
+          <div class="header-sort-wrapper">
+            <span>Date</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
+          </div>
+        </th>
+
+        <!-- Market column -->
+        {% if cur_sort == 'market' %}
+          {% set next_sort, sort_icon = '-market', 'arrow-up' %}
+        {% elif cur_sort == '-market' %}
+          {% set next_sort, sort_icon = 'market', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = 'market', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par marché"
+        >
+          <div class="header-sort-wrapper">
+            <span>Marché</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
+          </div>
+        </th>
+
+        <!-- Company column -->
+        {% if cur_sort == 'issuer_name' %}
+          {% set next_sort, sort_icon = '-issuer_name', 'arrow-up' %}
+        {% elif cur_sort == '-issuer_name' %}
+          {% set next_sort, sort_icon = 'issuer_name', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = 'issuer_name', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par société"
+        >
+          <div class="header-sort-wrapper">
+            <span>Société</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
+          </div>
+        </th>
+
+        <!-- Document type column -->
+        {% if cur_sort == 'document_type' %}
+          {% set next_sort, sort_icon = '-document_type', 'arrow-up' %}
+        {% elif cur_sort == '-document_type' %}
+          {% set next_sort, sort_icon = 'document_type', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = 'document_type', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par type de document"
+        >
+          <div class="header-sort-wrapper">
+            <span>Type</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
+          </div>
+        </th>
+
+        <!-- Title column -->
+        {% if cur_sort == 'title' %}
+          {% set next_sort, sort_icon = '-title', 'arrow-up' %}
+        {% elif cur_sort == '-title' %}
+          {% set next_sort, sort_icon = 'title', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = 'title', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par titre de document"
+        >
+          <div class="header-sort-wrapper">
+            <span>Titre du document</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
+          </div>
+        </th>
+
+        <!-- Actions (non-sortable) -->
+        <th class="actions-header">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in results %}
+      <tr>
+        <td class="date-cell">
+          <div class="date-wrapper">
+            <i data-lucide="calendar" class="cell-icon-small"></i>
+            <span>{{ row.get("published_at") or "" }}</span>
+          </div>
+        </td>
+        <td><span class="market-badge">{{ row.get("market") or "" }}</span></td>
+        <td class="issuer-cell font-semibold">{{ row.get("issuer_name") or "" }}</td>
+        <td>
+          {% set doc_type = row.get("document_type") or "" %}
+          <span class="badge badge-doc-{{ doc_type }}">
+            {% if doc_type == "annual_financial_report" %}
+              Rapport Annuel
+            {% elif doc_type == "half_year_financial_report" %}
+              Rapport Semestriel
+            {% elif doc_type == "quarterly_financial_report" %}
+              Rapport Trimestriel
+            {% elif doc_type == "universal_registration_document" %}
+              URD
+            {% elif doc_type == "financial_report" %}
+              Rapport Financier
+            {% elif doc_type == "esef" %}
+              ESEF
+            {% else %}
+              {{ doc_type }}
+            {% endif %}
+          </span>
+        </td>
+        <td class="title-cell" title="{{ row.get('title') or '' }}">{{ row.get("title") or "" }}</td>
+        <td class="actions">
+          <div class="actions-group-vertical">
+            <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-action-small open-btn" title="Ouvrir le document dans un nouvel onglet">
+              <i data-lucide="external-link"></i>
+            </a>
+            <button type="button" class="btn-action-small copy-link" data-url="{{ row.get('url') or '' }}" title="Copier le lien du document dans le presse-papiers">
+              <i data-lucide="copy"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="empty-row">
+          <div class="empty-state">
+            <i data-lucide="search-code" class="empty-icon"></i>
+            <p>Aucun document ne correspond à vos filtres.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
   <button
     type="button"
-    hx-get="/partials/searches/{{ job_id }}/results?page={{ page - 1 }}&document_type={{ filters.document_type }}&market={{ filters.market }}&source={{ filters.source }}&q={{ filters.q }}&issuer_isin={{ filters.issuer_isin }}&sort={{ filters.sort }}"
+    class="btn-pagination-prev"
+    hx-get="/partials/searches/{{ job_id }}/results"
+    hx-vals='{"page": {{ page - 1 }}, "page_size": {{ page_size }}}'
+    hx-include="#results-filters"
     hx-target="#results-table"
     hx-swap="innerHTML"
-  >Précédent</button>
+  >
+    <i data-lucide="chevron-left"></i>
+    <span>Précédent</span>
+  </button>
+  {% else %}
+  <span class="btn-pagination-prev disabled">
+    <i data-lucide="chevron-left"></i>
+    <span>Précédent</span>
+  </span>
   {% endif %}
+  
+  <div class="pagination-info">
+    <span>Page {{ page }} / {{ total_pages }}</span>
+  </div>
+
   {% if page < total_pages %}
   <button
     type="button"
-    hx-get="/partials/searches/{{ job_id }}/results?page={{ page + 1 }}&document_type={{ filters.document_type }}&market={{ filters.market }}&source={{ filters.source }}&q={{ filters.q }}&issuer_isin={{ filters.issuer_isin }}&sort={{ filters.sort }}"
+    class="btn-pagination-next"
+    hx-get="/partials/searches/{{ job_id }}/results"
+    hx-vals='{"page": {{ page + 1 }}, "page_size": {{ page_size }}}'
+    hx-include="#results-filters"
     hx-target="#results-table"
     hx-swap="innerHTML"
-  >Suivant</button>
+  >
+    <span>Suivant</span>
+    <i data-lucide="chevron-right"></i>
+  </button>
+  {% else %}
+  <span class="btn-pagination-next disabled">
+    <span>Suivant</span>
+    <i data-lucide="chevron-right"></i>
+  </span>
   {% endif %}
 </nav>
 {% endif %}

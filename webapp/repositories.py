@@ -14,9 +14,14 @@ from webapp.services.filters import document_matches_query
 _SORT_WHITELIST = {
     "published_at": "published_at ASC",
     "-published_at": "published_at DESC",
-    "title": "title ASC",
-    "market": "market ASC",
-    "document_type": "document_type ASC",
+    "title": "title COLLATE NOCASE ASC",
+    "-title": "title COLLATE NOCASE DESC",
+    "market": "market COLLATE NOCASE ASC",
+    "-market": "market COLLATE NOCASE DESC",
+    "document_type": "document_type COLLATE NOCASE ASC",
+    "-document_type": "document_type COLLATE NOCASE DESC",
+    "issuer_name": "issuer_name COLLATE NOCASE ASC",
+    "-issuer_name": "issuer_name COLLATE NOCASE DESC",
 }
 
 
@@ -86,7 +91,14 @@ def _document_to_row(job_id: str, document: LinkSearchDocument) -> dict[str, obj
         "source_publication_date_raw": (
             document.source_publication_date_raw or None
         ),
-        "metadata_json": json.dumps(document.metadata, ensure_ascii=False),
+        "metadata_json": json.dumps(
+            {
+                k: v for k, v in document.metadata.items()
+                if not k.startswith("_")
+            },
+            default=str,
+            ensure_ascii=False,
+        ),
         "created_at": utc_now(),
     }
 

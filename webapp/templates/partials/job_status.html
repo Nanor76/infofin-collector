@@ -1,45 +1,149 @@
-<div class="job-status status-{{ status.status }}">
-  <p><strong>Statut :</strong> {{ status.status }} — {{ status.results_count }} résultat(s)</p>
+{% set terminal_statuses = ["done", "partial", "failed", "cancelled"] %}
+<div
+  class="job-status status-{{ status.status }}"
+  data-status="{{ status.status }}"
+  data-terminal="{{ 'true' if status.status in terminal_statuses else 'false' }}"
+>
+  <!-- Summary Stat Cards -->
+  <div class="status-summary-grid">
+    <!-- Stat card 1: Statut -->
+    <div class="stat-card">
+      <div class="stat-icon-wrapper status-bg-{{ status.status }}">
+        {% if status.status == "running" %}
+        <i data-lucide="loader-2" class="spin-icon text-blue"></i>
+        {% elif status.status == "done" %}
+        <i data-lucide="check-circle-2" class="text-green"></i>
+        {% elif status.status == "partial" %}
+        <i data-lucide="alert-circle" class="text-amber"></i>
+        {% else %}
+        <i data-lucide="x-circle" class="text-red"></i>
+        {% endif %}
+      </div>
+      <div class="stat-details">
+        <span class="stat-label">Statut de la recherche</span>
+        <span class="stat-value text-capitalize">
+          {% if status.status == "running" %}
+            En cours
+          {% elif status.status == "done" %}
+            Terminée
+          {% elif status.status == "partial" %}
+            Partielle
+          {% elif status.status == "failed" %}
+            Échouée
+          {% elif status.status == "cancelled" %}
+            Annulée
+          {% else %}
+            {{ status.status }}
+          {% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Stat card 2: Résultats -->
+    <div class="stat-card">
+      <div class="stat-icon-wrapper bg-indigo-trans">
+        <i data-lucide="file-check" class="text-indigo"></i>
+      </div>
+      <div class="stat-details">
+        <span class="stat-label">Total indexé</span>
+        <span class="stat-value">{{ status.results_count }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Animation for Running State -->
+  {% if status.status == "running" %}
+  <div class="search-progress-bar">
+    <div class="progress-bar-fill"></div>
+  </div>
+  {% endif %}
+
+  <!-- Alerts / Warnings / Errors -->
   {% if status.warnings %}
-  <div class="alerts warnings">
-    {% for warning in status.warnings %}
-    <p>{{ warning }}</p>
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% if status.errors %}
-  <div class="alerts errors">
-    {% for error in status.errors %}
-    <p>{{ error }}</p>
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% if status.markets %}
-  <table class="market-runs">
-    <thead>
-      <tr>
-        <th>Marché</th>
-        <th>Source</th>
-        <th>Statut</th>
-        <th>Candidats</th>
-        <th>Résultats</th>
-        <th>Avertissement</th>
-        <th>Erreur</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for run in status.markets %}
-      <tr>
-        <td>{{ run.market }}</td>
-        <td>{{ run.source or "" }}</td>
-        <td><span class="badge">{{ run.status }}</span></td>
-        <td>{{ run.candidates_returned }}</td>
-        <td>{{ run.results_count }}</td>
-        <td>{{ run.warning or "" }}</td>
-        <td>{{ run.error or "" }}</td>
-      </tr>
+  <div class="dashboard-alert warning-alert">
+    <div class="alert-icon-title">
+      <i data-lucide="alert-triangle"></i>
+      <h3>Avertissements ({{ status.warnings|length }})</h3>
+    </div>
+    <div class="alert-messages">
+      {% for warning in status.warnings %}
+      <p>{{ warning }}</p>
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if status.errors %}
+  <div class="dashboard-alert error-alert">
+    <div class="alert-icon-title">
+      <i data-lucide="x-octagon"></i>
+      <h3>Erreurs ({{ status.errors|length }})</h3>
+    </div>
+    <div class="alert-messages">
+      {% for error in status.errors %}
+      <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Markets Run Status list -->
+  {% if status.markets %}
+  <div class="market-runs-section">
+    <h3>État par source et marché</h3>
+    <div class="market-runs-grid">
+      {% for run in status.markets %}
+      <div class="market-run-badge-card status-border-{{ run.status }}">
+        <div class="run-card-header">
+          <span class="run-market-name">{{ run.market }}</span>
+          <span class="run-status-indicator status-text-{{ run.status }}">
+            {% if run.status == "ok" %}
+            <i data-lucide="check-circle" class="run-status-icon"></i>
+            {% elif run.status == "running" %}
+            <i data-lucide="loader-2" class="run-status-icon spin-icon"></i>
+            {% else %}
+            <i data-lucide="alert-circle" class="run-status-icon"></i>
+            {% endif %}
+            {{ run.status }}
+          </span>
+        </div>
+        <div class="run-card-body">
+          <div class="run-stat-row">
+            <span class="run-stat-label">Source</span>
+            <span class="run-stat-val font-mono">{{ run.source or "N/A" }}</span>
+          </div>
+          <div class="run-stat-row">
+            <span class="run-stat-label">Documents trouvés</span>
+            <span class="run-stat-val font-semibold">{{ run.results_count }}</span>
+          </div>
+          {% if run.warning %}
+          <div class="run-card-message warning">
+            <i data-lucide="alert-triangle"></i>
+            <span>{{ run.warning }}</span>
+          </div>
+          {% endif %}
+          {% if run.error %}
+          <div class="run-card-message error">
+            <i data-lucide="alert-circle"></i>
+            <span>{{ run.error }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Trigger a final load of results when job is terminal to prevent race condition -->
+  {% if status.status in terminal_statuses %}
+  <div
+    style="display:none;"
+    hx-get="/partials/searches/{{ status.job_id }}/results"
+    hx-trigger="load"
+    hx-target="#results-table"
+    hx-include="#results-filters"
+    hx-swap="innerHTML"
+  ></div>
   {% endif %}
 </div>

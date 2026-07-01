@@ -48,7 +48,7 @@ def _request_from_schema(payload: SearchCreateRequest) -> LinkSearchRequest:
         formats=tuple(payload.formats),
         date_confidences=tuple(payload.date_confidences),
         max_candidates=payload.max_candidates,
-        dedupe_url=payload.dedupe_url,
+        dedupe_url=True,
     )
 
 

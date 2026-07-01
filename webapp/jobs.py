@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 
@@ -33,8 +34,20 @@ class JobManager:
     def _run_job(self, job_id: str, request: LinkSearchRequest) -> None:
         self.repository.mark_job_running(job_id)
         result_set = self.search_service.search_links(request)
+        
+        # Count final documents per market (after deduplication/filtering)
+        final_counts = {}
+        for doc in result_set.documents:
+            for m in doc.market.split(","):
+                m_clean = m.strip()
+                final_counts[m_clean] = final_counts.get(m_clean, 0) + 1
+                
+        # Save market runs with final deduplicated counts
         for summary in result_set.market_summaries:
-            self.repository.upsert_market_run(job_id, summary)
+            final_count = final_counts.get(summary.market, 0)
+            updated_summary = replace(summary, documents_count=final_count)
+            self.repository.upsert_market_run(job_id, updated_summary)
+            
         self.repository.replace_results(job_id, result_set.documents)
         if result_set.errors and result_set.documents:
             status = "partial"

@@ -1,70 +1,132 @@
 {% extends "layout.html" %}
 {% block title %}Résultats — InfoFin{% endblock %}
 {% block content %}
-<section class="panel">
-  <div class="results-header">
-    <h1>Résultats</h1>
-    <div class="export-actions">
-      <a class="btn-secondary" href="/api/searches/{{ job_id }}/export?format=csv">Export CSV</a>
-      <a class="btn-secondary" href="/api/searches/{{ job_id }}/export?format=json">Export JSON</a>
-    </div>
-  </div>
-  <div
-    id="job-status"
-    hx-get="/partials/searches/{{ job_id }}/status"
-    hx-trigger="load, every 2s"
-    hx-swap="innerHTML"
-  >
-    {% include "partials/job_status.html" %}
-  </div>
-</section>
+{% set terminal_statuses = ["done", "partial", "failed", "cancelled"] %}
+{% set is_terminal = status.status in terminal_statuses %}
 
-<section class="panel" id="results-panel">
-  <form
-    id="results-filters"
-    class="filters-form"
-    hx-get="/partials/searches/{{ job_id }}/results"
-    hx-target="#results-table"
-    hx-trigger="change, submit"
-    hx-include="#results-filters"
-  >
-    <div class="field-row">
-      <div class="field">
-        <label for="filter_document_type">Type</label>
-        <select id="filter_document_type" name="document_type">
-          <option value="">Tous</option>
-          {% for value, label in document_types %}
-          <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="filter_market">Marché</label>
-        <input type="text" id="filter_market" name="market" placeholder="Euronext Paris">
-      </div>
-      <div class="field">
-        <label for="filter_source">Source</label>
-        <input type="text" id="filter_source" name="source">
-      </div>
-      <div class="field">
-        <label for="filter_q">Texte</label>
-        <input type="text" id="filter_q" name="q">
-      </div>
-      <div class="field">
-        <label for="filter_isin">ISIN</label>
-        <input type="text" id="filter_isin" name="issuer_isin">
+<div class="results-container">
+  <!-- Top Navigation & Actions -->
+  <div class="results-top-nav">
+    <a href="/" class="btn-back">
+      <i data-lucide="arrow-left"></i>
+      <span>Nouvelle recherche</span>
+    </a>
+    
+    <div class="export-actions">
+      <span class="export-label">Exporter :</span>
+      <a class="btn-export csv" href="/api/searches/{{ job_id }}/export?format=csv">
+        <i data-lucide="file-spreadsheet"></i>
+        <span>CSV</span>
+      </a>
+      <a class="btn-export json" href="/api/searches/{{ job_id }}/export?format=json">
+        <i data-lucide="braces"></i>
+        <span>JSON</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Status Section Card -->
+  <div class="dashboard-card status-card">
+    <div class="card-header">
+      <div class="header-title">
+        <i data-lucide="activity" class="header-icon pulse-icon"></i>
+        <h2>Suivi de la recherche</h2>
       </div>
     </div>
-  </form>
-  <div
-    id="results-table"
-    hx-get="/partials/searches/{{ job_id }}/results"
-    hx-trigger="load, every 2s"
-    hx-swap="innerHTML"
-  >
-    {% if show_initial_results %}
-    {% include "partials/results_table.html" %}
-    {% endif %}
+    
+    <div
+      id="job-status"
+      hx-get="/partials/searches/{{ job_id }}/status"
+      hx-trigger="load, every 2s"
+      hx-swap="innerHTML"
+      class="job-status-wrapper"
+    >
+      {% include "partials/job_status.html" %}
+    </div>
   </div>
-</section>
+
+  <!-- Filters & Results Card -->
+  <div class="dashboard-card results-card" id="results-panel">
+    <div class="card-header">
+      <div class="header-title">
+        <i data-lucide="list-filter" class="header-icon"></i>
+        <h2>Filtres dynamiques</h2>
+      </div>
+    </div>
+
+    <!-- Interactive Filters Form -->
+    <form
+      id="results-filters"
+      class="filters-form"
+      hx-get="/partials/searches/{{ job_id }}/results"
+      hx-target="#results-table"
+      hx-trigger="change, keyup delay:200ms, submit"
+      hx-include="#results-filters"
+    >
+      <input type="hidden" name="sort" value="-published_at">
+      <div class="filters-grid">
+        <div class="field">
+          <label for="filter_document_type">Type de document</label>
+          <div class="select-wrapper">
+            <select id="filter_document_type" name="document_type">
+              <option value="">Tous les types</option>
+              {% for value, label in document_types %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        
+        <div class="field">
+          <label for="filter_market">Marché</label>
+          <div class="input-with-icon">
+            <i data-lucide="globe" class="input-icon"></i>
+            <input type="text" id="filter_market" name="market" placeholder="ex: Paris, Oslo...">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="filter_source">Source</label>
+          <div class="input-with-icon">
+            <i data-lucide="server" class="input-icon"></i>
+            <input type="text" id="filter_source" name="source" placeholder="ex: amf, newsweb...">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="filter_q">Texte / Mots-clés</label>
+          <div class="input-with-icon">
+            <i data-lucide="search" class="input-icon"></i>
+            <input type="text" id="filter_q" name="q" placeholder="ex: Rapport, fusion...">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="filter_isin">Société (ISIN)</label>
+          <div class="input-with-icon">
+            <i data-lucide="hash" class="input-icon"></i>
+            <input type="text" id="filter_isin" name="issuer_isin" placeholder="ex: FR0000...">
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- Table Container -->
+    <div class="table-outer-wrapper">
+      <div
+        id="results-table"
+        {% if not is_terminal %}
+        hx-get="/partials/searches/{{ job_id }}/results"
+        hx-trigger="load [infofinShouldPollResults()], every 2s [infofinShouldPollResults()]"
+        hx-include="#results-filters"
+        hx-swap="innerHTML"
+        {% endif %}
+      >
+        {% if show_initial_results %}
+        {% include "partials/results_table.html" %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
