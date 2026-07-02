@@ -108,27 +108,48 @@ def _enrich_row_lei(connection, row: dict[str, object]) -> None:
     if row.get("issuer_lei"):
         return
     isin = row.get("issuer_isin")
-    if isin:
-        try:
+    name = row.get("issuer_name")
+    if not isin and not name:
+        return
+
+    # 1. Try local database lookup first
+    try:
+        if isin:
             db_row = connection.execute(
                 "SELECT lei FROM issuers WHERE isin = ?", (isin,)
             ).fetchone()
             if db_row and db_row["lei"]:
                 row["issuer_lei"] = db_row["lei"]
                 return
-        except sqlite3.OperationalError:
-            pass
-    name = row.get("issuer_name")
-    if name:
-        try:
+        if name:
             db_row = connection.execute(
                 "SELECT lei FROM issuers WHERE name = ? COLLATE NOCASE", (name,)
             ).fetchone()
             if db_row and db_row["lei"]:
                 row["issuer_lei"] = db_row["lei"]
                 return
-        except sqlite3.OperationalError:
-            pass
+    except sqlite3.OperationalError:
+        pass
+
+    # 2. If not found in DB, try to resolve via GLEIF (cache first, then live API)
+    try:
+        import requests
+        import lei_resolver
+        with requests.Session() as session:
+            lei = lei_resolver.resolve_lei(isin, name, session)
+            if lei:
+                row["issuer_lei"] = lei
+                # Also save it to the database for persistence
+                if isin:
+                    try:
+                        connection.execute(
+                            "UPDATE issuers SET lei = ?, updated_at = ? WHERE isin = ?",
+                            (lei, date.today().isoformat(), isin)
+                        )
+                    except sqlite3.OperationalError:
+                        pass
+    except Exception:
+        pass
 
 
 def _row_to_dict(row) -> dict[str, object]:
