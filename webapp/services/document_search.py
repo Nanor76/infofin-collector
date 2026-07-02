@@ -168,7 +168,136 @@ class DocumentSearchService:
         self.session_factory = session_factory
         self.connector_factory = connector_factory
 
-    def search_links(self, request: LinkSearchRequest) -> LinkSearchResultSet:
+    def search_market_links(
+        self,
+        market: str,
+        request: LinkSearchRequest,
+    ) -> tuple[tuple[LinkSearchDocument, ...], MarketSearchSummary, str | None, str | None]:
+        normalized_market = normalize_market(market)
+        session = self.session_factory(
+            retries=self.settings.http_retries,
+            backoff_factor=self.settings.http_backoff_factor,
+            user_agent=self.settings.user_agent,
+            verify=self.settings.http_verify_ssl,
+        )
+        warning = None
+        error = None
+        market_documents: tuple[LinkSearchDocument, ...] = ()
+        summary = None
+        try:
+            connector = self.connector_factory(
+                normalized_market,
+                settings=self.settings,
+                session=session,
+            )
+            if connector is None:
+                error = f"{normalized_market}: aucun connecteur"
+                summary = MarketSearchSummary(
+                    market=normalized_market,
+                    source="",
+                    status="error",
+                    error="aucun connecteur",
+                )
+                return market_documents, summary, None, error
+
+            if not getattr(connector, "supports_source_first", False):
+                message = "source-first non supporté"
+                error = f"{normalized_market}: {message}"
+                summary = MarketSearchSummary(
+                    market=normalized_market,
+                    source=getattr(connector, "source_name", ""),
+                    status="error",
+                    error=message,
+                )
+                return market_documents, summary, None, error
+
+            try:
+                candidates = connector.search_recent_documents(
+                    normalized_market,
+                    since=request.date_from,
+                    limit=request.max_candidates,
+                )
+            except Exception as exc:
+                error = f"{normalized_market}: {exc}"
+                summary = MarketSearchSummary(
+                    market=normalized_market,
+                    source=getattr(connector, "source_name", ""),
+                    status="error",
+                    error=str(exc),
+                )
+                return market_documents, summary, None, error
+
+            unique: dict[tuple[str, str], DocumentCandidate] = {}
+            for candidate in candidates:
+                publication_date = _document_publication_date(candidate)
+                if publication_date is None:
+                    continue
+                if (
+                    publication_date < request.date_from
+                    or publication_date > request.date_to
+                ):
+                    continue
+                key = (
+                    candidate.source,
+                    candidate.source_document_id or candidate.url,
+                )
+                unique.setdefault(key, candidate)
+
+            market_documents = tuple(
+                _candidate_to_document(normalized_market, candidate)
+                for candidate in sorted(
+                    unique.values(),
+                    key=lambda item: (
+                        _document_publication_date(item) or date.min,
+                        item.source,
+                        item.title.casefold(),
+                        item.url,
+                    ),
+                    reverse=True,
+                )
+            )
+
+            # Apply individual market filtering before returning
+            filtered_market_documents = filter_documents(
+                market_documents,
+                document_types=request.document_types,
+                query=request.query,
+                issuer_isin=request.issuer_isin,
+                sources=request.sources,
+                formats=request.formats,
+                date_confidences=request.date_confidences,
+            )
+
+            warn_msg = ""
+            if len(candidates) >= request.max_candidates:
+                warn_msg = (
+                    "le nombre de candidats retournés atteint "
+                    f"--max-candidates={request.max_candidates}; "
+                    "augmenter ce plafond pour prouver "
+                    "l'exhaustivité sur cette période"
+                )
+                warning = f"{normalized_market}: {warn_msg}"
+
+            summary = MarketSearchSummary(
+                market=normalized_market,
+                source=getattr(connector, "source_name", ""),
+                status="ok",
+                candidates_returned=len(candidates),
+                documents_count=len(filtered_market_documents),
+                warning=warn_msg,
+            )
+            return filtered_market_documents, summary, warning, error
+        finally:
+            close = getattr(session, "close", None)
+            if callable(close):
+                close()
+
+    def search_links(
+        self,
+        request: LinkSearchRequest,
+        *,
+        on_market_complete: Callable[[MarketSearchSummary, tuple[LinkSearchDocument, ...]], None] | None = None,
+    ) -> LinkSearchResultSet:
         if request.date_from > request.date_to:
             raise ValueError(
                 "--date-from doit être inférieur ou égal à --date-to"
@@ -176,136 +305,61 @@ class DocumentSearchService:
         if request.max_candidates < 1:
             raise ValueError("max_candidates doit être supérieur ou égal à 1")
 
-        session = self.session_factory(
-            retries=self.settings.http_retries,
-            backoff_factor=self.settings.http_backoff_factor,
-            user_agent=self.settings.user_agent,
-            verify=self.settings.http_verify_ssl,
-        )
         documents: list[LinkSearchDocument] = []
         errors: list[str] = []
         warnings: list[str] = []
         market_summaries: list[MarketSearchSummary] = []
-        try:
-            for market in request.markets:
-                normalized_market = normalize_market(market)
-                connector = self.connector_factory(
-                    normalized_market,
-                    settings=self.settings,
-                    session=session,
-                )
-                if connector is None:
-                    errors.append(f"{normalized_market}: aucun connecteur")
-                    market_summaries.append(
-                        MarketSearchSummary(
-                            market=normalized_market,
-                            source="",
-                            status="error",
-                            error="aucun connecteur",
-                        )
-                    )
-                    continue
-                if not getattr(connector, "supports_source_first", False):
-                    message = "source-first non supporté"
-                    errors.append(f"{normalized_market}: {message}")
-                    market_summaries.append(
-                        MarketSearchSummary(
-                            market=normalized_market,
-                            source=getattr(connector, "source_name", ""),
-                            status="error",
-                            error=message,
-                        )
-                    )
-                    continue
 
+        max_workers = min(10, max(1, len(request.markets)))
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_market = {
+                executor.submit(self.search_market_links, market, request): market
+                for market in request.markets
+            }
+            for future in as_completed(future_to_market):
+                market = future_to_market[future]
                 try:
-                    candidates = connector.search_recent_documents(
-                        normalized_market,
-                        since=request.date_from,
-                        limit=request.max_candidates,
-                    )
+                    market_docs, summary, warning, error = future.result()
+                    if error:
+                        errors.append(error)
+                    if warning:
+                        warnings.append(warning)
+                    market_summaries.append(summary)
+                    documents.extend(market_docs)
+
+                    if on_market_complete is not None:
+                        on_market_complete(summary, market_docs)
                 except Exception as exc:
-                    errors.append(f"{normalized_market}: {exc}")
-                    market_summaries.append(
-                        MarketSearchSummary(
-                            market=normalized_market,
-                            source=getattr(connector, "source_name", ""),
-                            status="error",
-                            error=str(exc),
-                        )
-                    )
-                    continue
-
-                unique: dict[tuple[str, str], DocumentCandidate] = {}
-                for candidate in candidates:
-                    publication_date = _document_publication_date(candidate)
-                    if publication_date is None:
-                        continue
-                    if (
-                        publication_date < request.date_from
-                        or publication_date > request.date_to
-                    ):
-                        continue
-                    key = (
-                        candidate.source,
-                        candidate.source_document_id or candidate.url,
-                    )
-                    unique.setdefault(key, candidate)
-
-                market_documents = tuple(
-                    _candidate_to_document(normalized_market, candidate)
-                    for candidate in sorted(
-                        unique.values(),
-                        key=lambda item: (
-                            _document_publication_date(item) or date.min,
-                            item.source,
-                            item.title.casefold(),
-                            item.url,
-                        ),
-                        reverse=True,
-                    )
-                )
-                documents.extend(market_documents)
-                warning = ""
-                if len(candidates) >= request.max_candidates:
-                    warning = (
-                        "le nombre de candidats retournés atteint "
-                        f"--max-candidates={request.max_candidates}; "
-                        "augmenter ce plafond pour prouver "
-                        "l'exhaustivité sur cette période"
-                    )
-                    warnings.append(f"{normalized_market}: {warning}")
-                market_summaries.append(
-                    MarketSearchSummary(
+                    normalized_market = normalize_market(market)
+                    err_msg = f"{normalized_market}: exception non gérée: {exc}"
+                    errors.append(err_msg)
+                    summary = MarketSearchSummary(
                         market=normalized_market,
-                        source=getattr(connector, "source_name", ""),
-                        status="ok",
-                        candidates_returned=len(candidates),
-                        documents_count=len(market_documents),
-                        warning=warning,
+                        source="",
+                        status="error",
+                        error=str(exc),
                     )
-                )
-        finally:
-            close = getattr(session, "close", None)
-            if callable(close):
-                close()
+                    market_summaries.append(summary)
+                    if on_market_complete is not None:
+                        on_market_complete(summary, ())
 
-        filtered = filter_documents(
-            tuple(documents),
-            document_types=request.document_types,
-            query=request.query,
-            issuer_isin=request.issuer_isin,
-            sources=request.sources,
-            formats=request.formats,
-            date_confidences=request.date_confidences,
-        )
+        filtered = tuple(documents)
         if request.dedupe_url:
             filtered = _dedupe_documents_by_url(filtered)
+
+        # Sort the summaries in the original order of request.markets for consistency
+        market_order = {normalize_market(m): i for i, m in enumerate(request.markets)}
+        sorted_summaries = sorted(
+            market_summaries,
+            key=lambda s: market_order.get(s.market, 9999),
+        )
 
         return LinkSearchResultSet(
             request=request,
             documents=filtered,
-            market_summaries=tuple(market_summaries),
+            market_summaries=tuple(sorted_summaries),
             warnings=tuple(warnings),
             errors=tuple(errors),
         )

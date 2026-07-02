@@ -141,7 +141,7 @@
             <span>{{ row.get("published_at") or "" }}</span>
           </div>
         </td>
-        <td><span class="market-badge">{{ row.get("market") or "" }}</span></td>
+        <td><span class="market-badge" title="{{ row.get('market') or '' }}">{{ row.get("market") or "" }}</span></td>
         <td class="issuer-cell font-semibold">{{ row.get("issuer_name") or "" }}</td>
         <td>
           {% set doc_type = row.get("document_type") or "" %}

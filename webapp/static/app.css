@@ -261,6 +261,11 @@ select {
   outline: none;
 }
 
+select option {
+  background: #111726;
+  color: #fff;
+}
+
 input[type="text"]:focus,
 input[type="date"]:focus,
 select:focus {
@@ -351,39 +356,143 @@ input::placeholder {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
-/* Markets Checkbox Cards Grid */
-.market-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 0.75rem;
-}
-
-.market-checkbox-card {
-  cursor: pointer;
-}
-
-.market-checkbox-card input[type="checkbox"] {
-  display: none;
-}
-
-.market-checkbox-card .card-inner {
+/* Markets Selection Split Layout */
+.card-header-split {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 1.25rem;
+}
+
+.market-quick-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-quick {
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.market-checkbox-card:hover .card-inner {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  transform: translateY(-1px);
+.btn-quick:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--accent);
+  color: #fff;
 }
 
-.checkbox-indicator {
+.market-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .market-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.market-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  height: 480px;
+}
+
+.market-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.market-search-wrapper input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem 0.6rem 2.2rem;
+  color: #fff;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.market-search-wrapper input:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search-icon-inside {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.market-list {
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-right: 0.25rem;
+}
+
+/* Custom Scrollbar for list */
+.market-list::-webkit-scrollbar {
+  width: 5px;
+}
+.market-list::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+.market-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+.market-list::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.market-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid transparent;
+}
+
+.market-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.market-row input[type="checkbox"] {
+  display: none;
+}
+
+.custom-checkbox {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -393,9 +502,10 @@ input::placeholder {
   border: 1px solid #4b5563;
   background: rgba(0,0,0,0.2);
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.checkbox-indicator svg {
+.custom-checkbox svg {
   width: 12px;
   height: 12px;
   color: #fff;
@@ -404,25 +514,195 @@ input::placeholder {
   transform: scale(0.6);
 }
 
-.market-checkbox-card input[type="checkbox"]:checked + .card-inner {
-  background: rgba(99, 102, 241, 0.08);
-  border-color: var(--accent);
-}
-
-.market-checkbox-card input[type="checkbox"]:checked + .card-inner .checkbox-indicator {
+.market-row input[type="checkbox"]:checked + .custom-checkbox {
   background: var(--accent);
   border-color: var(--accent);
 }
 
-.market-checkbox-card input[type="checkbox"]:checked + .card-inner .checkbox-indicator svg {
+.market-row input[type="checkbox"]:checked + .custom-checkbox svg {
   opacity: 1;
   transform: scale(1);
 }
 
-.market-label {
-  font-weight: 600;
+.market-text {
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.market-city-text {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Map Container Styles */
+.market-map-container {
+  position: relative;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  overflow: hidden;
+  height: 480px;
+}
+
+.map-loading {
+  position: absolute;
+  color: var(--text-muted);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2;
+}
+/* Floating Map Controls */
+.map-controls {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  z-index: 10;
+  background: rgba(17, 23, 38, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.map-control-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.map-control-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #fff;
+}
+
+.map-control-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.europe-map-svg-wrapper {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+/* Interactive SVG Styling */
+.europe-map-svg-wrapper svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  cursor: grab;
+  user-select: none;
+  filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.5));
+}
+
+.europe-map-svg-wrapper path {
+  fill: rgba(255, 255, 255, 0.02); /* Faint background for non-interactive landmass */
+  stroke: rgba(255, 255, 255, 0.05); /* Faint borders */
+  stroke-width: 0.5;
+  transition: fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+}
+
+.europe-map-svg-wrapper path.country-interactive {
+  fill: rgba(99, 102, 241, 0.1); /* Indigo tint for countries with markets */
+  stroke: rgba(99, 102, 241, 0.3); /* Clear borders for countries with markets */
+  stroke-width: 0.8;
+  cursor: pointer;
+}
+
+.europe-map-svg-wrapper path.country-interactive:hover {
+  fill: rgba(99, 102, 241, 0.3) !important;
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
+}
+
+.europe-map-svg-wrapper path.country-selected {
+  fill: rgba(99, 102, 241, 0.7) !important; /* Bright selected state */
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+}
+
+/* Tooltip on Map */
+.map-tooltip {
+  position: absolute;
+  background: rgba(17, 23, 38, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  max-width: 250px;
+}
+
+.tooltip-title {
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 0.25rem;
+}
+
+.tooltip-markets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.35rem 0;
+}
+
+.tooltip-markets li {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0.15rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.tooltip-markets li::before {
+  content: "•";
+  color: var(--accent);
+  font-weight: bold;
+  display: inline-block;
+  width: 10px;
+}
+
+.tooltip-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* Document Type Chip Grid */
@@ -1055,6 +1335,39 @@ input::placeholder {
   border-collapse: collapse;
   font-size: 13px;
   text-align: left;
+  table-layout: fixed;
+}
+
+/* Enforce column widths */
+.results-table th:nth-child(1),
+.results-table td:nth-child(1) {
+  width: 135px; /* Date */
+}
+
+.results-table th:nth-child(2),
+.results-table td:nth-child(2) {
+  width: 135px; /* Marché */
+}
+
+.results-table th:nth-child(3),
+.results-table td:nth-child(3) {
+  width: 170px; /* Société */
+}
+
+.results-table th:nth-child(4),
+.results-table td:nth-child(4) {
+  width: 145px; /* Type */
+}
+
+.results-table th:nth-child(5),
+.results-table td:nth-child(5) {
+  width: auto; /* Titre (grows to fill remaining space) */
+}
+
+.results-table th:nth-child(6),
+.results-table td:nth-child(6) {
+  width: 75px; /* Actions */
+  text-align: right;
 }
 
 .results-table th {
@@ -1145,17 +1458,22 @@ input::placeholder {
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
 }
 
 .issuer-cell {
-  max-width: 180px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .title-cell {
-  max-width: 250px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1300,10 +1618,10 @@ input::placeholder {
 
 .actions-group-vertical {
   display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 6px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .btn-action-small {

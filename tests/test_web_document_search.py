@@ -221,3 +221,58 @@ def test_search_links_rejects_invalid_date_range(tmp_path: Path) -> None:
         assert "date-from" in str(exc)
     else:
         raise AssertionError("ValueError attendue")
+
+
+def test_search_links_parallel_and_callback(tmp_path: Path) -> None:
+    candidate_paris = DocumentCandidate(
+        title="Paris report",
+        url="https://official.test/paris.pdf",
+        published_date=date(2026, 6, 12),
+        document_type="annual_financial_report",
+        source="fake-oam",
+        source_document_id="doc-paris",
+    )
+    candidate_brussels = DocumentCandidate(
+        title="Brussels report",
+        url="https://official.test/brussels.pdf",
+        published_date=date(2026, 6, 12),
+        document_type="annual_financial_report",
+        source="fake-oam",
+        source_document_id="doc-brussels",
+    )
+
+    connectors = {
+        "Euronext Paris": FakeSourceFirstConnector([candidate_paris]),
+        "Euronext Brussels": FakeSourceFirstConnector([candidate_brussels]),
+    }
+
+    completed_summaries = []
+    completed_documents = []
+
+    def on_market_complete(summary, docs):
+        completed_summaries.append(summary)
+        completed_documents.extend(docs)
+
+    result = DocumentSearchService(
+        make_settings(tmp_path),
+        session_factory=lambda **kwargs: FakeSession(),
+        connector_factory=lambda market, **kwargs: connectors[market],
+    ).search_links(
+        LinkSearchRequest(
+            markets=("Euronext Paris", "Euronext Brussels"),
+            date_from=date(2026, 6, 10),
+            date_to=date(2026, 6, 15),
+        ),
+        on_market_complete=on_market_complete,
+    )
+
+    # Verify callback was called for both markets
+    assert len(completed_summaries) == 2
+    assert {s.market for s in completed_summaries} == {"Euronext Paris", "Euronext Brussels"}
+    assert len(completed_documents) == 2
+
+    # Verify final result contains both
+    assert len(result.documents) == 2
+    assert len(result.market_summaries) == 2
+    assert result.market_summaries[0].market == "Euronext Paris"
+    assert result.market_summaries[1].market == "Euronext Brussels"

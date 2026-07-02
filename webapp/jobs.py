@@ -5,9 +5,12 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 
 from webapp.repositories import WebSearchRepository
+from load_watchlist import normalize_market
 from webapp.services.document_search import (
     DocumentSearchService,
     LinkSearchRequest,
+    LinkSearchDocument,
+    MarketSearchSummary,
 )
 
 
@@ -33,7 +36,27 @@ class JobManager:
 
     def _run_job(self, job_id: str, request: LinkSearchRequest) -> None:
         self.repository.mark_job_running(job_id)
-        result_set = self.search_service.search_links(request)
+        
+        # Pre-populate all market runs as 'running'
+        for market in request.markets:
+            summary = MarketSearchSummary(
+                market=normalize_market(market),
+                source="",
+                status="running",
+            )
+            self.repository.upsert_market_run(job_id, summary)
+
+        # Callback to update status and append results in real time
+        def on_market_complete(summary: MarketSearchSummary, documents: tuple[LinkSearchDocument, ...]) -> None:
+            self.repository.upsert_market_run(job_id, summary)
+            self.repository.append_results(job_id, documents, dedupe_url=request.dedupe_url)
+
+        import inspect
+        sig = inspect.signature(self.search_service.search_links)
+        if "on_market_complete" in sig.parameters:
+            result_set = self.search_service.search_links(request, on_market_complete=on_market_complete)
+        else:
+            result_set = self.search_service.search_links(request)
         
         # Count final documents per market (after deduplication/filtering)
         final_counts = {}
@@ -68,10 +91,13 @@ class JobManager:
         if job is None:
             return None
         markets = self.repository.list_market_runs(job_id)
+        results_count = job["results_count"]
+        if job["status"] in {"running", "queued"}:
+            results_count = self.repository.count_results(job_id)
         return {
             "job_id": job_id,
             "status": job["status"],
-            "results_count": job["results_count"],
+            "results_count": results_count,
             "warnings": job["warnings"],
             "errors": job["errors"],
             "markets": markets,

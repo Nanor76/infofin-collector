@@ -230,11 +230,60 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     def search_page(request: Request) -> HTMLResponse:
+        market_metadata = {
+            "Euronext Paris": {"city": "Paris", "country": "France", "code": "FR"},
+            "Oslo Børs": {"city": "Oslo", "country": "Norvège", "code": "NO"},
+            "Euronext Milan": {"city": "Milan", "country": "Italie", "code": "IT"},
+            "Euronext Star Milan": {"city": "Milan", "country": "Italie", "code": "IT"},
+            "Euronext Growth Milan": {"city": "Milan", "country": "Italie", "code": "IT"},
+            "Euronext MIV Milan": {"city": "Milan", "country": "Italie", "code": "IT"},
+            "Euronext Amsterdam": {"city": "Amsterdam", "country": "Pays-Bas", "code": "NL"},
+            "Euronext Brussels": {"city": "Bruxelles", "country": "Belgique", "code": "BE"},
+            "Euronext Growth Brussels": {"city": "Bruxelles", "country": "Belgique", "code": "BE"},
+            "Euronext Lisbon": {"city": "Lisbonne", "country": "Portugal", "code": "PT"},
+            "Euronext Dublin": {"city": "Dublin", "country": "Irlande", "code": "IE"},
+            "Bolsa de Madrid": {"city": "Madrid", "country": "Espagne", "code": "ES"},
+            "Bolsa de Barcelona": {"city": "Barcelone", "country": "Espagne", "code": "ES"},
+            "Bolsa de Bilbao": {"city": "Bilbao", "country": "Espagne", "code": "ES"},
+            "Bolsa de Valencia": {"city": "Valence", "country": "Espagne", "code": "ES"},
+            "BME Growth": {"city": "Madrid", "country": "Espagne", "code": "ES"},
+            "BME Scaleup": {"city": "Madrid", "country": "Espagne", "code": "ES"},
+            "Nasdaq Stockholm": {"city": "Stockholm", "country": "Suède", "code": "SE"},
+            "Nordic Growth Market": {"city": "Stockholm", "country": "Suède", "code": "SE"},
+            "Nasdaq Copenhagen": {"city": "Copenhague", "country": "Danemark", "code": "DK"},
+            "Nasdaq Helsinki": {"city": "Helsinki", "country": "Finlande", "code": "FI"},
+            "Vienna Stock Exchange": {"city": "Vienne", "country": "Autriche", "code": "AT"},
+            "Warsaw Stock Exchange": {"city": "Varsovie", "country": "Pologne", "code": "PL"},
+            "Prague Stock Exchange": {"city": "Prague", "country": "République Tchèque", "code": "CZ"},
+            "Zagreb Stock Exchange": {"city": "Zagreb", "country": "Croatie", "code": "HR"},
+            "Ljubljana Stock Exchange": {"city": "Ljubljana", "country": "Slovénie", "code": "SI"},
+            "Tallinn Stock Exchange": {"city": "Tallinn", "country": "Estonie", "code": "EE"},
+            "Riga Stock Exchange": {"city": "Riga", "country": "Lettonie", "code": "LV"},
+            "Vilnius Stock Exchange": {"city": "Vilnius", "country": "Lituanie", "code": "LT"},
+            "Bratislava Stock Exchange": {"city": "Bratislava", "country": "Slovaquie", "code": "SK"},
+            "Bucharest Stock Exchange": {"city": "Bucarest", "country": "Roumanie", "code": "RO"},
+            "Bulgarian Stock Exchange": {"city": "Sofia", "country": "Bulgarie", "code": "BG"},
+            "Malta Stock Exchange": {"city": "Malte", "country": "Malte", "code": "MT"},
+        }
+        
+        markets_list = []
+        for name in SUPPORTED_WATCH_MARKETS:
+            meta = market_metadata.get(name, {"city": name, "country": "Europe", "code": "EU"})
+            markets_list.append({
+                "name": name,
+                "city": meta["city"],
+                "country": meta["country"],
+                "code": meta["code"]
+            })
+            
+        # Sort by city (alphabetical), then by market name
+        markets_list.sort(key=lambda m: (m["city"].casefold(), m["name"].casefold()))
+        
         return _TEMPLATES.TemplateResponse(
             request,
             "search.html",
             {
-                "markets": SUPPORTED_WATCH_MARKETS,
+                "markets": markets_list,
                 "document_types": DOCUMENT_TYPES,
             },
         )

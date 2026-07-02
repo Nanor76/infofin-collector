@@ -9,25 +9,61 @@
 
   <form id="search-form" class="search-form">
     <!-- Panel 1: Marchés -->
-    <div class="form-card">
-      <div class="card-header">
-        <i data-lucide="globe" class="header-icon"></i>
-        <div>
-          <h2>Marchés cibles</h2>
-          <p class="card-desc">Sélectionnez les marchés réglementés à interroger.</p>
+    <div class="form-card market-selection-card">
+      <div class="card-header-split">
+        <div class="card-header">
+          <i data-lucide="globe" class="header-icon"></i>
+          <div>
+            <h2>Marchés cibles</h2>
+            <p class="card-desc">Sélectionnez les marchés réglementés à interroger sur la carte ou dans la liste.</p>
+          </div>
+        </div>
+        <div class="market-quick-actions">
+          <button type="button" class="btn-quick" id="btn-select-all">Tous</button>
+          <button type="button" class="btn-quick" id="btn-select-none">Aucun</button>
         </div>
       </div>
       
-      <div class="market-grid">
-        {% for market in markets %}
-        <label class="market-checkbox-card">
-          <input type="checkbox" name="markets" value="{{ market }}">
-          <div class="card-inner">
-            <span class="checkbox-indicator"><i data-lucide="check"></i></span>
-            <span class="market-label">{{ market }}</span>
+      <div class="market-split-layout">
+        <!-- Left: Search and List -->
+        <div class="market-list-container">
+          <div class="market-search-wrapper">
+            <i data-lucide="search" class="search-icon-inside"></i>
+            <input type="text" id="market-search" placeholder="Rechercher une ville, un marché...">
           </div>
-        </label>
-        {% endfor %}
+          
+          <div class="market-list" id="market-checkbox-list">
+            {% for market in markets %}
+            <label class="market-row" data-code="{{ market.code }}" data-city="{{ market.city }}" data-name="{{ market.name }}">
+              <input type="checkbox" name="markets" value="{{ market.name }}" class="market-input">
+              <span class="custom-checkbox">
+                <i data-lucide="check"></i>
+              </span>
+              <span class="market-text">
+                <strong class="market-city-text">{{ market.city }}</strong> 
+                <span class="market-name-text">— {{ market.name }}</span>
+              </span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        
+        <!-- Right: SVG Map -->
+        <div class="market-map-container">
+          <div class="map-tooltip" id="map-tooltip"></div>
+          <div class="map-loading" id="map-loading">
+            <i data-lucide="loader-2" class="spin-icon"></i> <span>Chargement de la carte...</span>
+          </div>
+          
+          <!-- Controls Panel -->
+          <div class="map-controls">
+            <button type="button" class="map-control-btn" id="map-zoom-in" title="Zoomer"><i data-lucide="plus"></i></button>
+            <button type="button" class="map-control-btn" id="map-zoom-out" title="Dézoomer"><i data-lucide="minus"></i></button>
+            <button type="button" class="map-control-btn" id="map-zoom-reset" title="Recentrer"><i data-lucide="rotate-ccw"></i></button>
+          </div>
+          
+          <div id="europe-map-svg" class="europe-map-svg-wrapper"></div>
+        </div>
       </div>
     </div>
 

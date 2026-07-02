@@ -172,27 +172,115 @@ class WebSearchRepository:
         summary: MarketSearchSummary,
     ) -> None:
         with self.database.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO web_search_market_runs(
-                    job_id, market, source, status,
-                    candidates_returned, results_count,
-                    warning, error, finished_at
+            row = connection.execute(
+                "SELECT id, started_at FROM web_search_market_runs WHERE job_id = ? AND market = ?",
+                (job_id, summary.market),
+            ).fetchone()
+            
+            finished_at = None if summary.status == "running" else utc_now()
+            
+            if row:
+                started_at = row["started_at"] or utc_now()
+                connection.execute(
+                    """
+                    UPDATE web_search_market_runs
+                    SET source = ?, status = ?, candidates_returned = ?, results_count = ?,
+                        warning = ?, error = ?, finished_at = ?, started_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        summary.source or None,
+                        summary.status,
+                        summary.candidates_returned,
+                        summary.documents_count,
+                        summary.warning or None,
+                        summary.error or None,
+                        finished_at,
+                        started_at,
+                        row["id"],
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    job_id,
-                    summary.market,
-                    summary.source or None,
-                    summary.status,
-                    summary.candidates_returned,
-                    summary.documents_count,
-                    summary.warning or None,
-                    summary.error or None,
-                    utc_now(),
-                ),
-            )
+            else:
+                started_at = utc_now()
+                connection.execute(
+                    """
+                    INSERT INTO web_search_market_runs(
+                        job_id, market, source, status,
+                        candidates_returned, results_count,
+                        warning, error, started_at, finished_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        job_id,
+                        summary.market,
+                        summary.source or None,
+                        summary.status,
+                        summary.candidates_returned,
+                        summary.documents_count,
+                        summary.warning or None,
+                        summary.error or None,
+                        started_at,
+                        finished_at,
+                    ),
+                )
+
+    def append_results(
+        self,
+        job_id: str,
+        documents: tuple[LinkSearchDocument, ...],
+        dedupe_url: bool = False,
+    ) -> None:
+        with self.database.connect() as connection:
+            for document in documents:
+                if dedupe_url and document.url:
+                    existing = connection.execute(
+                        """
+                        SELECT id, market FROM web_search_results
+                        WHERE job_id = ? AND url = ?
+                        """,
+                        (job_id, document.url),
+                    ).fetchone()
+                    if existing:
+                        existing_markets = [m.strip() for m in existing["market"].split(",")]
+                        new_market = document.market.strip()
+                        if new_market not in existing_markets:
+                            existing_markets.append(new_market)
+                            updated_market = ", ".join(existing_markets)
+                            connection.execute(
+                                """
+                                UPDATE web_search_results
+                                SET market = ?
+                                WHERE id = ?
+                                """,
+                                (updated_market, existing["id"]),
+                            )
+                        continue
+
+                row = _document_to_row(job_id, document)
+                connection.execute(
+                    """
+                    INSERT INTO web_search_results(
+                        job_id, market, source, source_document_id,
+                        published_at, period_end_date, reporting_year,
+                        document_type, classification, title, url,
+                        issuer_name, issuer_isin, issuer_lei, category,
+                        file_format, date_confidence,
+                        source_publication_date_raw, metadata_json,
+                        created_at
+                    )
+                    VALUES (
+                        :job_id, :market, :source, :source_document_id,
+                        :published_at, :period_end_date, :reporting_year,
+                        :document_type, :classification, :title, :url,
+                        :issuer_name, :issuer_isin, :issuer_lei, :category,
+                        :file_format, :date_confidence,
+                        :source_publication_date_raw, :metadata_json,
+                        :created_at
+                    )
+                    """,
+                    row,
+                )
 
     def replace_results(
         self,
@@ -229,6 +317,14 @@ class WebSearchRepository:
                     """,
                     row,
                 )
+
+    def count_results(self, job_id: str) -> int:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) as cnt FROM web_search_results WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+        return row["cnt"] if row else 0
 
     def get_job(self, job_id: str) -> dict[str, object] | None:
         with self.database.connect() as connection:
