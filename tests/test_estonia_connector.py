@@ -130,6 +130,21 @@ def test_listing_and_detail_parsing() -> None:
             "Management interim statement or quarterly financial report",
             "quarterly_financial_report",
         ),
+        (
+            "Consolidated Unaudited Interim Report for the 3rd quarter and 9 months of 2025/2026 financial year",
+            "Management interim statement or quarterly financial report",
+            "quarterly_financial_report",
+        ),
+        (
+            "Unaudited financial report for the first quarter of 2026",
+            "Other corporate action",
+            "quarterly_financial_report",
+        ),
+        (
+            "Baltic Horizon Fund consolidated unaudited results for Q1 2026",
+            "Other corporate action",
+            "quarterly_financial_report",
+        ),
     ],
 )
 def test_periodic_classification(
@@ -150,6 +165,7 @@ def test_periodic_classification(
         "UCITS annual report factsheet",
         "Share buyback annual financial report",
         "Net asset value of the EfTEN United Property Fund as of 31.05.2026",
+        "AS Tallinna Vesi held an investor conference webinar to introduce the results of the first quarter of 2026",
     ],
 )
 def test_negative_terms_override_periodic_terms(title: str) -> None:

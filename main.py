@@ -368,6 +368,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Supprime les jobs créés avant ce nombre de jours.",
     )
 
+    resolve_leis_parser = subparsers.add_parser(
+        "resolve-leis",
+        help="Interroge la base de données GLEIF pour enrichir tous les émetteurs avec leur code LEI.",
+    )
+
     check_parser = subparsers.add_parser(
         "check",
         help="Recherche et télécharge les nouveaux rapports officiels.",
@@ -4122,6 +4127,22 @@ def main(argv: list[str] | None = None) -> int:
                 import_to_db=args.import_db,
                 database=database,
             )
+            if args.import_db:
+                import lei_resolver
+                from http_client import build_http_session
+                session = build_http_session(
+                    retries=settings.http_retries,
+                    backoff_factor=settings.http_backoff_factor,
+                    user_agent=settings.user_agent,
+                    verify=settings.http_verify_ssl,
+                )
+                try:
+                    lei_resolver.sync_database_leis(database, session)
+                except Exception as e:
+                    LOGGER.warning("Auto LEI resolution failed after sync: %s", e)
+                finally:
+                    session.close()
+
             exit_code = 0
             for result in results:
                 if result.error:
@@ -4144,6 +4165,21 @@ def main(argv: list[str] | None = None) -> int:
                 market=args.market if not args.all else None,
             )
         if args.command == "watch":
+            import lei_resolver
+            from http_client import build_http_session
+            session = build_http_session(
+                retries=settings.http_retries,
+                backoff_factor=settings.http_backoff_factor,
+                user_agent=settings.user_agent,
+                verify=settings.http_verify_ssl,
+            )
+            try:
+                lei_resolver.sync_database_leis(database, session)
+            except Exception as e:
+                LOGGER.warning("Auto LEI resolution failed before watch: %s", e)
+            finally:
+                session.close()
+
             outcome = run_watch(
                 database,
                 settings,
@@ -4203,6 +4239,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "diagnose-eodhd":
             from screener.cli import run_diagnose_eodhd
             return run_diagnose_eodhd(settings)
+        if args.command == "resolve-leis":
+            import lei_resolver
+            from http_client import build_http_session
+            session = build_http_session(
+                retries=settings.http_retries,
+                backoff_factor=settings.http_backoff_factor,
+                user_agent=settings.user_agent,
+                verify=settings.http_verify_ssl,
+            )
+            try:
+                updated_count = lei_resolver.sync_database_leis(database, session)
+                print(f"Mise à jour terminée. {updated_count} LEIs résolus.")
+                return 0
+            finally:
+                session.close()
         parser.error(f"Commande inconnue: {args.command}")
     except (OSError, sqlite3.Error, ValueError) as exc:
         LOGGER.error("%s", exc)

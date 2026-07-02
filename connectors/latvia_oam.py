@@ -173,6 +173,8 @@ def classify_latvia_document(
         "half-year",
         "semi annual",
         "semi-annual",
+        "6 months",
+        "six months",
         "pusgada",
         "pusgada parskats",
     )
@@ -323,12 +325,16 @@ def extract_latvia_date_info(
                         quarter_month = month
                         break
                 if quarter_month:
-                    period_end = date(
+                    inferred_period_end = date(
                         reporting_year,
                         quarter_month,
                         31 if quarter_month in {3, 12} else 30,
                     )
-                    reason += "; quarter end inferred from explicit quarter"
+                    if published_at and inferred_period_end > published_at:
+                        reason += "; inferred quarter end after publication ignored"
+                    else:
+                        period_end = inferred_period_end
+                        reason += "; quarter end inferred from explicit quarter"
 
     return {
         "published_at": published_at,

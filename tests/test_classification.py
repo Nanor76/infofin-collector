@@ -9,8 +9,11 @@ from classification import classify_document, supported_extension
         ("Rapport financier annuel 2025", "https://example.test/a.pdf", "annual_financial_report"),
         ("Half-year financial report", "https://example.test/h1.pdf", "half_year_financial_report"),
         ("Document d'enregistrement universel", "https://example.test/deu.pdf", "universal_registration_document"),
+        ("Document d'enregistrement universel 2025 - Annual financial report", "https://example.test/deu.pdf", "universal_registration_document"),
         ("Package réglementaire", "https://example.test/report.zip", "esef"),
         ("Présentation investisseurs", "https://example.test/slides.pdf", None),
+        ("Press Release: Availability of the aide-mémoire for Q2 2026 results", "https://example.test/q2.pdf", None),
+        ("REPORT DE LA PUBLICATION DU RAPPORT FINANCIER ANNUEL 2025", "https://example.test/postponement.pdf", None),
     ],
 )
 def test_classification_rules(title: str, url: str, expected: str | None) -> None:

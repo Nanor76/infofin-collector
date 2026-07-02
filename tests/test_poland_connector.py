@@ -8,6 +8,7 @@ from connectors.base import ConnectorState
 from connectors.poland_knf_oam import (
     PolandKnfOamConnector,
     classify_poland_document,
+    classify_poland_notice,
     parse_poland_detail,
     parse_poland_listing,
 )
@@ -86,6 +87,62 @@ def test_strict_poland_classification() -> None:
         assert classification == "other_regulatory_announcement"
         assert positive == []
         assert negative == ([code] if code else [])
+
+
+def test_poland_title_fallback_classifies_foreign_periodic_reports() -> None:
+    examples = [
+        (
+            "RB-W",
+            "MOL Group releases 2025 Half Year Report",
+            "ghdul2mk91_Raport.zip",
+            "half_year_financial_report",
+        ),
+        (
+            "UNI-EN",
+            "Entity & Consolidated Financial Report for Q2 and H1 2025",
+            "21fskmjss1_Raport.zip",
+            "half_year_financial_report",
+        ),
+        (
+            "UNI-EN",
+            "ANNUAL REPORT FOR THE YEAR ENDED 30 JUNE 2025",
+            "FY2025_Kernel_Annual_Report.pdf",
+            "annual_financial_report",
+        ),
+        (
+            "RB-W",
+            "EUBG_CONSOLIDATED_REPORT_Q3_2025",
+            "EUBG_CONSOLIDATED_REPORT_Q3_2025.pdf",
+            "quarterly_financial_report",
+        ),
+    ]
+    for code, title, filename, expected in examples:
+        classification, reason, positive, negative = classify_poland_notice(
+            code,
+            title,
+            filename,
+        )
+        assert classification == expected
+        assert "title fallback" in reason
+        assert positive
+        assert negative == []
+
+
+def test_poland_title_fallback_rejects_common_false_positives() -> None:
+    examples = [
+        (
+            "UNI-EN",
+            "KERNEL ANNOUNCES DATE FOR Q1 FY2026 OPERATIONS UPDATE PUBLICATION",
+        ),
+        ("RB-W", "Q3 2025 revenues"),
+        ("RB-W", "EUBG_Bond_ISIN BG2100002224_Q2_2025"),
+        ("RB", "Zaliczka na poczet dywidendy Q3 2025"),
+        ("RB", "Zmiana terminu przekazania raportu półrocznego"),
+    ]
+    for code, title in examples:
+        classification, _, _, negative = classify_poland_notice(code, title)
+        assert classification == "other_regulatory_announcement"
+        assert negative
 
 
 def test_source_first_filters_before_detail_and_materializes_periodic() -> None:

@@ -182,20 +182,36 @@ def classify_lithuania_document(
         "q4",
         "ketvirtinis",
         "ketvircio",
+        "pirmo ketvircio",
+        "pirmojo ketvircio",
+        "antro ketvircio",
+        "trecio ketvircio",
+        "ketvirto ketvircio",
+        "i ketvircio",
+        "ii ketvircio",
+        "iii ketvircio",
+        "iv ketvircio",
         "trijų mėnesių",
         "triju menesiu",
         "3 menesiu",
         "3 menesio",
+        "devynių mėnesių",
+        "devyniu menesiu",
+        "9 menesiu",
+        "nine months",
     )
     half_year = (
         "half year",
         "half-year",
         "semi annual",
         "semi-annual",
+        "six months",
         "pusmetinio",
         "pusmetines",
         "pusmecio",
         "pusmecio informacija",
+        "šešių mėnesių",
+        "sesiu menesiu",
         "6 menesiu",
         "6 menesio",
     )
@@ -268,7 +284,10 @@ def classify_lithuania_document(
         _normalize(PERIODIC_CATEGORIES["172"]),
         _normalize("Tarpinė informacija"),
     }:
-        if re.search(r"\bq[1-4]\b|ketvirt|trijų mėnesių|triju menesiu", haystack):
+        if re.search(
+            r"\bq[1-4]\b|ketvirt|triju menesiu|devyniu menesiu|9 menesiu",
+            haystack,
+        ):
             return (
                 "quarterly_financial_report",
                 "OAM Lithuania interim category 172 with quarterly title",
@@ -352,24 +371,41 @@ def extract_lithuania_date_info(
                     ("first quarter", 3),
                     ("q2", 6),
                     ("second quarter", 6),
+                    ("antro ketvircio", 6),
+                    ("ii ketvircio", 6),
                     ("q3", 9),
                     ("third quarter", 9),
+                    ("devynių mėnesių", 9),
+                    ("devyniu menesiu", 9),
+                    ("9 menesiu", 9),
+                    ("nine months", 9),
+                    ("trecio ketvircio", 9),
+                    ("iii ketvircio", 9),
                     ("q4", 12),
                     ("fourth quarter", 12),
+                    ("ketvirto ketvircio", 12),
+                    ("iv ketvircio", 12),
                     ("trijų mėnesių", 3),
                     ("triju menesiu", 3),
+                    ("pirmo ketvircio", 3),
+                    ("pirmojo ketvircio", 3),
+                    ("i ketvircio", 3),
                     ("ketvirt", 3),
                 ):
                     if marker in normalized:
                         quarter_month = month
                         break
                 if quarter_month:
-                    period_end = date(
+                    inferred_period_end = date(
                         reporting_year,
                         quarter_month,
                         31 if quarter_month in {3, 12} else 30,
                     )
-                    reason += "; quarter end inferred from explicit quarter"
+                    if published_at and inferred_period_end > published_at:
+                        reason += "; inferred quarter end after publication ignored"
+                    else:
+                        period_end = inferred_period_end
+                        reason += "; quarter end inferred from explicit quarter"
 
     return {
         "published_at": published_at,

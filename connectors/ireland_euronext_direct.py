@@ -136,7 +136,20 @@ def _file_type(filename: str, content_type: str = "") -> str | None:
 
 
 def _financial_type(category: str, title: str, filename: str) -> str | None:
+    title_text = _normalize(f"{title} {filename}")
+    category_text = _normalize(category)
     text = _normalize(f"{category} {title} {filename}")
+
+    classified = classify_document(title, filename)
+    if classified and classified != "esef":
+        return classified
+
+    if re.search(r"\bq[1-4]\b", title_text) or re.search(
+        r"\b(?:first|second|third|fourth) quarter\b",
+        title_text,
+    ):
+        return "quarterly_financial_report"
+
     if any(
         marker in text
         for marker in (
@@ -162,11 +175,19 @@ def _financial_type(category: str, title: str, filename: str) -> str | None:
         )
     ):
         return "annual_financial_report"
-    classified = classify_document(f"{category} {title}", filename)
-    if classified:
+
+    classified = classify_document(category, "")
+    if classified and classified != "esef":
         return classified
-    if any(marker in text for marker in ("esef", "xhtml", "xml", "zip")):
-        return "esef"
+
+    if any(
+        marker in category_text
+        for marker in (
+            "half yearly financial reports and audit reports",
+            "annual financial and audit reports",
+        )
+    ):
+        return "financial_report"
     return None
 
 

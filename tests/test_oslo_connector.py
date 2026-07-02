@@ -149,7 +149,6 @@ def test_search_documents_handles_pagination_and_attachment_types() -> None:
     assert {candidate.document_type for candidate in candidates} == {
         "annual_financial_report",
         "quarterly_financial_report",
-        "esef",
     }
     assert any(
         dict(params or []).get("page") == "1"

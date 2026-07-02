@@ -99,6 +99,11 @@ def _normalize(value: object) -> str:
     return re.sub(r"[^a-z0-9]+", " ", ascii_value.casefold()).strip()
 
 
+def _has_phrase(haystack: str, term: str) -> bool:
+    normalized = _normalize(term)
+    return bool(normalized and f" {normalized} " in f" {haystack} ")
+
+
 def _normalize_issuer(value: object) -> str:
     normalized = _normalize(value)
     return re.sub(
@@ -228,17 +233,43 @@ def classify_malta_document(
 
     esef_joined = " ".join(esef_urls).casefold()
     if "_afr_" in esef_joined or "esefapp" in haystack:
-        if any(token in haystack for token in ("semi", "half year", "half yearly")):
+        if any(
+            _has_phrase(haystack, token)
+            for token in (
+                "semi annual",
+                "semi-annual",
+                "half year",
+                "half-year",
+                "half yearly",
+            )
+        ):
             return (
                 "half_year_financial_report",
                 "Malta ESEF semi-annual financial report",
                 ["esef_afr"],
                 [],
             )
-        if any(token in haystack for token in ("quarter", "interim", "q1", "q2", "q3", "q4")):
+        if any(
+            _has_phrase(haystack, token)
+            for token in (
+                "quarter",
+                "quarterly",
+                "interim report",
+                "interim financial",
+                "interim statement",
+                "q1",
+                "q2",
+                "q3",
+                "q4",
+            )
+        ):
             document_type = (
                 "quarterly_financial_report"
-                if "quarter" in haystack or re.search(r"\bq[1-4]\b", haystack)
+                if (
+                    _has_phrase(haystack, "quarter")
+                    or _has_phrase(haystack, "quarterly")
+                    or re.search(r"\bq[1-4]\b", haystack)
+                )
                 else "interim_report"
             )
             return (

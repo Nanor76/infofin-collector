@@ -9,6 +9,7 @@ from connectors.base import ConnectorState
 from connectors.ireland_euronext_direct import (
     DEFAULT_DUBLIN_URL,
     IrelandEuronextDirectConnector,
+    _financial_type,
     match_issuer_notice,
     parse_direct_html,
     parse_direct_json,
@@ -173,6 +174,29 @@ def test_json_and_html_parse_supported_documents() -> None:
         "pdf",
         "xhtml",
     }
+
+
+def test_financial_type_prefers_title_nature_over_format_or_category() -> None:
+    assert (
+        _financial_type(
+            "Half yearly financial reports and audit reports",
+            "DIGI - Q1 2026 Financial Report",
+            "digi-q1-2026.pdf",
+        )
+        == "quarterly_financial_report"
+    )
+    assert (
+        _financial_type(
+            "Annual financial and audit reports",
+            "2025 Annual Report ESEF",
+            "issuer-2025.xhtml",
+        )
+        == "annual_financial_report"
+    )
+    assert (
+        _financial_type("", "Transaction in Own Shares", "notice.xml.xmlc.xml.html")
+        is None
+    )
 
 
 def test_matching_prefers_isin_then_name_then_symbol() -> None:

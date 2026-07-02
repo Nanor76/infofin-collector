@@ -84,6 +84,29 @@ def test_periodic_classification(title: str, expected: str) -> None:
 
 
 @pytest.mark.parametrize(
+    ("title", "esef_url", "expected"),
+    [
+        (
+            "Approval and publication of Audited Financial Statements for the financial year ended 31 December 2025 for Issuer and Guarantor",
+            "https://cdn.borzamalta.com.mt/ESEFAPP/SGFP_20251231_CON_AFR_213800A1PC5JJQ42YB81_20260429120834896.zip",
+            "annual_financial_report",
+        ),
+        (
+            "Approval of the Financial Statements and Declaration of an Interim Dividend",
+            "https://cdn.borzamalta.com.mt/ESEFAPP/IHIP_20251231_CON_AFR_529900LVB0R279MUX376_20260424145718346.zip",
+            "annual_financial_report",
+        ),
+    ],
+)
+def test_esef_afr_is_not_confused_by_ids_or_interim_dividend(
+    title: str,
+    esef_url: str,
+    expected: str,
+) -> None:
+    assert classify_malta_document(title, esef_urls=(esef_url,))[0] == expected
+
+
+@pytest.mark.parametrize(
     "title",
     [
         "Updated Financial Analysis Summary",

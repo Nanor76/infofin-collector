@@ -8,6 +8,7 @@ from connectors.base import ConnectorState
 from connectors.belgium_fsma_stori import (
     ANNUAL_TYPE_ID,
     BelgiumFsmaStoriConnector,
+    _financial_type,
     match_issuer_notice,
     parse_api_notice,
     parse_stori_detail_html,
@@ -209,6 +210,17 @@ def test_api_parsing_classification_and_matching() -> None:
     }
     assert match_issuer_notice(issuer, notice)
     assert not match_issuer_notice(wrong, notice)
+
+
+def test_press_release_attachment_is_not_promoted_to_annual_report() -> None:
+    assert (
+        _financial_type(
+            "Annual financial report",
+            "PERSBERICHT - Co.Br.Ha. - jaarresultaten 2025 en resultaten Q1 2026.pdf",
+            "PERSBERICHT - Co.Br.Ha. - jaarresultaten 2025 en resultaten Q1 2026.pdf",
+        )
+        == "other_regulatory_announcement"
+    )
 
 
 def test_diagnose_discover_resolve_and_search() -> None:

@@ -101,6 +101,7 @@ def _issuer_from_row(row: sqlite3.Row) -> Issuer:
         investor_relations_url=_row_value(row, "investor_relations_url"),
         reports_url=_row_value(row, "reports_url"),
         pea_geography_status=_row_value(row, "pea_geography_status"),
+        lei=_row_value(row, "lei"),
     )
 
 
@@ -163,6 +164,7 @@ class Database:
             investor_relations_url TEXT,
             reports_url TEXT,
             pea_geography_status TEXT,
+            lei TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -401,6 +403,7 @@ class Database:
                 ("investor_relations_url", "TEXT"),
                 ("reports_url", "TEXT"),
                 ("pea_geography_status", "TEXT"),
+                ("lei", "TEXT"),
             ):
                 if name not in columns:
                     connection.execute(
@@ -592,6 +595,7 @@ class Database:
                     getattr(issuer, "investor_relations_url", None),
                     getattr(issuer, "reports_url", None),
                     getattr(issuer, "pea_geography_status", None),
+                    getattr(issuer, "lei", None),
                     now,
                     now,
                 )
@@ -654,6 +658,7 @@ class Database:
                     investor_relations_url,
                     reports_url,
                     pea_geography_status,
+                    lei,
                     created_at, updated_at
                 )
                 VALUES (
@@ -662,7 +667,7 @@ class Database:
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 ON CONFLICT(isin) DO UPDATE SET
                     name = excluded.name,
@@ -879,6 +884,10 @@ class Database:
                     pea_geography_status = COALESCE(
                         issuers.pea_geography_status,
                         excluded.pea_geography_status
+                    ),
+                    lei = COALESCE(
+                        issuers.lei,
+                        excluded.lei
                     ),
                     updated_at = excluded.updated_at
                 """,

@@ -163,10 +163,25 @@ def test_classification_keywords_and_categories() -> None:
             "1.1",
             "https://official.test/report.xbri",
         )
-        == "esef"
+        == "annual_financial_report"
     )
     assert (
         classify_italy_document("Relazione della società di revisione")
+        == "audit_report"
+    )
+    assert (
+        classify_italy_document(
+            "Verbale Assemblea ordinaria per approvazione del bilancio 2025",
+            "1.1",
+        )
+        == "other_regulatory_announcement"
+    )
+    assert (
+        classify_italy_document("IWB - bilancio ESEF con relazione BDO", "1.1")
+        == "annual_financial_report"
+    )
+    assert (
+        classify_italy_document("Relazione di revisione al bilancio chiuso al 31.12.2025", "1.1")
         == "audit_report"
     )
     assert classify_italy_document("Comunicato ordinario") is None

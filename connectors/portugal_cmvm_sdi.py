@@ -1002,17 +1002,12 @@ class PortugalCmvmSdiConnector(Connector):
             if not match_issuer_notice(issuer, notice):
                 continue
             for item in notice.files:
-                document_type = (
-                    "esef"
-                    if item.file_type in {"xhtml", "zip"}
-                    else notice.document_type
-                )
                 candidates.append(
                     DocumentCandidate(
                         title=notice.title,
                         url=item.download_url,
                         published_date=notice.published_date,
-                        document_type=document_type,
+                        document_type=notice.document_type,
                         source=self.source_name,
                         source_document_id=item.file_id,
                         metadata={
@@ -1061,11 +1056,7 @@ class PortugalCmvmSdiConnector(Connector):
                         title=notice.title,
                         url=item.download_url,
                         published_date=notice.published_date,
-                        document_type=(
-                            "esef"
-                            if item.file_type in {"xhtml", "zip"}
-                            else notice.document_type
-                        ),
+                        document_type=notice.document_type,
                         source=self.source_name,
                         source_document_id=item.file_id,
                         metadata={

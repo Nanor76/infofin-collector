@@ -93,6 +93,11 @@ def test_listing_and_detail_parsing() -> None:
             "Tarpinė informacija",
             "quarterly_financial_report",
         ),
+        (
+            'AB "VILNIAUS BALDAI" 2026 m. devynių mėnesių veiklos rezultatai ir neaudituotas sutrumpintų tarpinių konsoliduotųjų finansinių ataskaitų rinkinys',
+            "Tarpinė informacija",
+            "quarterly_financial_report",
+        ),
     ],
 )
 def test_periodic_classification(

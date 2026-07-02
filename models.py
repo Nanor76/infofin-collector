@@ -66,5 +66,6 @@ class Issuer:
     investor_relations_url: str | None = None
     reports_url: str | None = None
     pea_geography_status: str | None = None
+    lei: str | None = None
 
 

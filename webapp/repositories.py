@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import date
 
 from db import Database, utc_now
@@ -101,6 +102,33 @@ def _document_to_row(job_id: str, document: LinkSearchDocument) -> dict[str, obj
         ),
         "created_at": utc_now(),
     }
+
+
+def _enrich_row_lei(connection, row: dict[str, object]) -> None:
+    if row.get("issuer_lei"):
+        return
+    isin = row.get("issuer_isin")
+    if isin:
+        try:
+            db_row = connection.execute(
+                "SELECT lei FROM issuers WHERE isin = ?", (isin,)
+            ).fetchone()
+            if db_row and db_row["lei"]:
+                row["issuer_lei"] = db_row["lei"]
+                return
+        except sqlite3.OperationalError:
+            pass
+    name = row.get("issuer_name")
+    if name:
+        try:
+            db_row = connection.execute(
+                "SELECT lei FROM issuers WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchone()
+            if db_row and db_row["lei"]:
+                row["issuer_lei"] = db_row["lei"]
+                return
+        except sqlite3.OperationalError:
+            pass
 
 
 def _row_to_dict(row) -> dict[str, object]:
@@ -258,6 +286,7 @@ class WebSearchRepository:
                         continue
 
                 row = _document_to_row(job_id, document)
+                _enrich_row_lei(connection, row)
                 connection.execute(
                     """
                     INSERT INTO web_search_results(
@@ -294,6 +323,7 @@ class WebSearchRepository:
             )
             for document in documents:
                 row = _document_to_row(job_id, document)
+                _enrich_row_lei(connection, row)
                 connection.execute(
                     """
                     INSERT INTO web_search_results(

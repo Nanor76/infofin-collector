@@ -82,6 +82,13 @@
           </div>
         </th>
 
+        <!-- LEI column -->
+        <th>
+          <div class="header-sort-wrapper">
+            <span>LEI</span>
+          </div>
+        </th>
+
         <!-- Document type column -->
         {% if cur_sort == 'document_type' %}
           {% set next_sort, sort_icon = '-document_type', 'arrow-up' %}
@@ -143,6 +150,7 @@
         </td>
         <td><span class="market-badge" title="{{ row.get('market') or '' }}">{{ row.get("market") or "" }}</span></td>
         <td class="issuer-cell font-semibold">{{ row.get("issuer_name") or "" }}</td>
+        <td class="lei-cell font-mono text-xs">{{ row.get("issuer_lei") or "" }}</td>
         <td>
           {% set doc_type = row.get("document_type") or "" %}
           <span class="badge badge-doc-{{ doc_type }}">
@@ -177,7 +185,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" class="empty-row">
+        <td colspan="7" class="empty-row">
           <div class="empty-state">
             <i data-lucide="search-code" class="empty-icon"></i>
             <p>Aucun document ne correspond à vos filtres.</p>

@@ -171,7 +171,7 @@ def test_html_listing_and_detail_fixtures_are_parsed() -> None:
     assert classify_afm_document(
         documents[0].document_type,
         documents[0].filename,
-    ) == "esef"
+    ) == "annual_financial_report"
 
 
 def test_matching_issuer_and_home_member_state() -> None:
@@ -238,6 +238,7 @@ def test_diagnose_discover_resolve_and_search_use_real_afm_shapes() -> None:
     assert resolution.home_member_state == "Netherlands"
     assert len(candidates) == 1
     assert candidates[0].source == "afm"
-    assert candidates[0].document_type == "esef"
+    assert candidates[0].document_type == "annual_financial_report"
+    assert candidates[0].metadata["file_format"] == "zip"
     assert candidates[0].metadata["home_member_state"] == "Netherlands"
     assert session.head_calls

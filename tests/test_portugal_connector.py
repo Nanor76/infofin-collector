@@ -166,6 +166,9 @@ def test_matching_discovery_diagnostic_and_search() -> None:
         "xhtml",
         "zip",
     }
+    assert {item.document_type for item in candidates} == {
+        "annual_financial_report",
+    }
     assert all(item.source == "cmvm_sdi" for item in candidates)
     assert diagnostic.state == ConnectorState.READY
     assert diagnostic.checks["automatic_download"]

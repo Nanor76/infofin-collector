@@ -1,0 +1,342 @@
+{
+  "global_identifiers": {
+    "isin": {
+      "description": "International Securities Identification Number. The unique primary key for issuers in the database constraint.",
+      "type": "string"
+    },
+    "name": {
+      "description": "Official company name, used for text similarity matching and direct queries.",
+      "type": "string"
+    },
+    "symbol": {
+      "description": "Stock ticker or market symbol. Sometimes used as a fallback for registration numbers (e.g., ICO in Czechia).",
+      "type": "string"
+    },
+    "market": {
+      "description": "Stock exchange or segment where the company is traded, used to route the search to the correct connector.",
+      "type": "string"
+    }
+  },
+  "providers": [
+    {
+      "provider_id": "austria_oekb",
+      "market": "Vienna Stock Exchange",
+      "connector_file": "austria_oekb_oam.py",
+      "source_name": "oekb_feed",
+      "search_identifiers": ["isin", "name"],
+      "resolution_identifiers": ["isin", "name"],
+      "native_identifiers": {
+        "austria_oekb_oam_id": "OeKB Emittent ID (numeric identifier in OeKB public notices)",
+        "austria_oekb_oam_issuer_url": "Direct link to OeKB issuer page containing emittentId parameter"
+      },
+      "matching_strategy_search": "Filters feed notices: matches notice 'issuer_isins' with 'issuer.isin', or falls back to exact match on normalized name 'issuer.name' if no ISIN is present in the notice.",
+      "matching_strategy_resolution": "Scores notices from the public feed: ISIN match = 100%, exact Name match = 90%, substring or partial Name match = 80%. Resolves to the highest-scoring OeKB Emittent ID."
+    },
+    {
+      "provider_id": "belgium_fsma",
+      "market": "Euronext Brussels, Euronext Growth Brussels",
+      "connector_file": "belgium_fsma_stori.py",
+      "source_name": "fsma_stori",
+      "search_identifiers": ["isin", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "belgium_fsma_record_id": "STORI record ID extracted from Belgian FSMA notices",
+        "company_id": "FSMA numeric company identifier",
+        "company_number": "Belgian business registry number (CBE / BCE)"
+      },
+      "matching_strategy_search": "Scores notice against issuer. ISIN code match = 100%, exact name match = 85%, name substring match = 72%, name word overlap >= 60% = 60-70%, symbol match = 55%. Notice matches if score is >= 55%.",
+      "matching_strategy_resolution": "Fetches company register from FSMA, scores options using name and symbol abbreviation/localisedName, then verifies by fetching the company's notices and matching ISIN codes."
+    },
+    {
+      "provider_id": "bulgaria_bse",
+      "market": "Bulgarian Stock Exchange",
+      "connector_file": "bulgaria_bse_x3news.py",
+      "source_name": "bse_x3news",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "href": "BSE company bucket URL path"
+      },
+      "matching_strategy_search": "Normalizes issuer name and checks if it matches, contains, or is contained in the filing's issuer name.",
+      "matching_strategy_resolution": "Direct index syncing from Bulgarian Stock Exchange company listing pages (grouped by alphabet buckets)."
+    },
+    {
+      "provider_id": "croatia_hanfa",
+      "market": "Zagreb Stock Exchange",
+      "connector_file": "croatia_hanfa_srpi.py",
+      "source_name": "hanfa_srpi",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "HANFA SRPI attachment or record identifier"
+      },
+      "matching_strategy_search": "Filters recent feed documents where normalized candidate issuer name exactly matches issuer name.",
+      "matching_strategy_resolution": "Queries categories on the HANFA registry, matching normalized notice issuer name (exact match = 100%, inclusion = 85%)."
+    },
+    {
+      "provider_id": "czechia_cnb",
+      "market": "Prague Stock Exchange",
+      "connector_file": "czechia_cnb_curi.py",
+      "source_name": "czechia_cnb_oam",
+      "search_identifiers": ["isin", "name", "symbol"],
+      "resolution_identifiers": ["isin", "name", "symbol"],
+      "native_identifiers": {
+        "ico": "Czech Business Registration Number (stored in issuer.symbol / czechia_cnb_curi_record_id)",
+        "lei": "Legal Entity Identifier (often stored in notice.lei and matched against issuer.isin)"
+      },
+      "matching_strategy_search": "Matches notice if notice LEI matches issuer.isin, or notice ICO matches issuer.symbol, or issuer.name matches notice issuer name, or issuer.isin is extracted from the names of attached files.",
+      "matching_strategy_resolution": "Scores feed notices: LEI match = 100%, ICO match = 95%, exact Name match = 90%, ISIN found in notice files = 85%, partial Name match = 80%. Resolves to the registration number (ICO)."
+    },
+    {
+      "provider_id": "denmark_dfsa",
+      "market": "Nasdaq Copenhagen",
+      "connector_file": "denmark_dfsa_oam.py",
+      "source_name": "denmark_dfsa",
+      "search_identifiers": ["isin", "name", "symbol"],
+      "resolution_identifiers": ["isin", "name", "symbol"],
+      "native_identifiers": {
+        "denmark_dfsa_record_id": "Danish FSA notice record ID",
+        "denmark_nasdaq_company_url": "Nasdaq Nordic company page URL"
+      },
+      "matching_strategy_search": "Queries the OAM search endpoint using ISIN, Name, and Symbol. Matches notices where issuer.isin is in notice.issuer_isins, or normalized name/symbol are contained in notice issuer name/title.",
+      "matching_strategy_resolution": "Executes search queries and scores notices: ISIN match = 100%, Name match = 80%, Symbol match = 60%. Resolves to Danish FSA record ID."
+    },
+    {
+      "provider_id": "estonia_oam",
+      "market": "Tallinn Stock Exchange",
+      "connector_file": "estonia_oam.py",
+      "source_name": "estonia_oam",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Estonian OAM notice record ID"
+      },
+      "matching_strategy_search": "Filters recent feed documents where normalized candidate issuer name exactly matches issuer name.",
+      "matching_strategy_resolution": "Fetches registry notices and matches normalized issuer name vs notice issuer name (exact = 100%, inclusion = 85%)."
+    },
+    {
+      "provider_id": "finland_oam",
+      "market": "Nasdaq Helsinki",
+      "connector_file": "finland_oam.py",
+      "source_name": "finland_oam",
+      "search_identifiers": ["finland_oam_company_id", "name"],
+      "resolution_identifiers": ["name", "symbol"],
+      "native_identifiers": {
+        "finland_oam_company_id": "Finland OAM Company ID (stored in database for targeted queries)"
+      },
+      "matching_strategy_search": "Performs a targeted query using the resolved 'finland_oam_company_id'. Resolves it first if not present in the database.",
+      "matching_strategy_resolution": "Fetches CSRF tokens and company select dropdown lists from OAM, matches issuer name/symbol against options (exact name = 100%, name inclusion = 80%, symbol match = 60%)."
+    },
+    {
+      "provider_id": "france_amf",
+      "market": "Euronext Paris",
+      "connector_file": "france_info_financiere.py",
+      "source_name": "amf",
+      "search_identifiers": ["isin", "market"],
+      "resolution_identifiers": [],
+      "native_identifiers": {},
+      "matching_strategy_search": "Validates that issuer market is Euronext Paris, then queries the AMF OpenData API directly with query filters built using 'issuer.isin' (e.g., search(\"ISIN\")).",
+      "matching_strategy_resolution": "Not required, as the AMF OpenData API allows direct queries by ISIN."
+    },
+    {
+      "provider_id": "germany_fallback",
+      "market": "German markets (fallback crawler)",
+      "connector_file": "germany_fallback.py",
+      "source_name": "issuer_website_fallback",
+      "search_identifiers": ["investor_relations_url", "reports_url"],
+      "resolution_identifiers": [],
+      "native_identifiers": {},
+      "matching_strategy_search": "Uses the company's IR or report URLs from database. If missing, prints warning with issuer name/ISIN. Crawls pages to extract links matching file extensions and keywords.",
+      "matching_strategy_resolution": "N/A (Web crawler fallback)."
+    },
+    {
+      "provider_id": "ireland_euronext",
+      "market": "Euronext Dublin",
+      "connector_file": "ireland_euronext_direct.py",
+      "source_name": "euronext_direct",
+      "search_identifiers": ["isin", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "ireland_record_id": "Euronext Dublin/Direct company record ID"
+      },
+      "matching_strategy_search": "Scores notices: ISIN match = 100%, exact Name = 90%, Name inclusion = 82%, Name word overlap >= 60% = 65-80%, Name SequenceMatcher >= 0.78 = 60-75.6%, exact Symbol match = 70%, Symbol word in name/headline = 55%. Matches if score is >= 55%.",
+      "matching_strategy_resolution": "Queries company notices and ranks them using the same match scoring algorithm. Resolves to the best-matching notice record ID."
+    },
+    {
+      "provider_id": "italy_emarketstorage",
+      "market": "Euronext Milan, Euronext Star Milan, Euronext Growth Milan, Euronext MIV Milan",
+      "connector_file": "italy_emarketstorage.py",
+      "source_name": "emarketstorage",
+      "search_identifiers": ["market", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "emarket_issuer_id": "eMarket Storage numeric company identifier",
+        "borsa_italiana_company_url": "Borsa Italiana company profile URL constructed using issuer.isin"
+      },
+      "matching_strategy_search": "Scores notice company vs issuer. Exact name match = 1.0, substring >= 5 chars = max(score, 0.94), symbol word or initials match = max(score, 0.9). Matches if score is >= 0.84.",
+      "matching_strategy_resolution": "Downloads eMarket Storage company options list and matches name and symbol against options using the search scoring logic."
+    },
+    {
+      "provider_id": "latvia_oam",
+      "market": "Riga Stock Exchange",
+      "connector_file": "latvia_oam.py",
+      "source_name": "latvia_oam",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Latvian OAM notice record ID"
+      },
+      "matching_strategy_search": "Filters recent feed documents where normalized candidate issuer name exactly matches issuer name.",
+      "matching_strategy_resolution": "Fetches registry notices and matches normalized issuer name vs notice issuer name (exact = 100%, inclusion = 85%)."
+    },
+    {
+      "provider_id": "lithuania_oam",
+      "market": "Vilnius Stock Exchange",
+      "connector_file": "lithuania_oam.py",
+      "source_name": "lithuania_oam",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Lithuanian OAM notice record ID"
+      },
+      "matching_strategy_search": "Filters recent feed documents where normalized candidate issuer name equals or contains/is contained in issuer name.",
+      "matching_strategy_resolution": "Matches normalized notice issuer name (exact = 100%, inclusion = 85%). If no match, scans the OAM's 'company-select' dropdown options (exact = 100%, inclusion = 85%)."
+    },
+    {
+      "provider_id": "malta_mse",
+      "market": "Malta Stock Exchange",
+      "connector_file": "malta_mse_oam.py",
+      "source_name": "mse_oam",
+      "search_identifiers": ["name", "symbol"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Malta MSE OAM notice record ID"
+      },
+      "matching_strategy_search": "Fetches notices and checks if normalized issuer name is in notice issuer name, or if issuer.symbol is contained in notice issuer name.",
+      "matching_strategy_resolution": "Matches notice issuer name vs issuer.name (exact = 100%, inclusion = 85%)."
+    },
+    {
+      "provider_id": "netherlands_afm",
+      "market": "Euronext Amsterdam",
+      "connector_file": "netherlands_afm.py",
+      "source_name": "afm",
+      "search_identifiers": ["isin", "market", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "afm_record_id": "AFM financial reporting register record ID"
+      },
+      "matching_strategy_search": "Scores registry records: ISIN in record text = 1.0, exact name match = 1.0, substring >= 4 chars = max(score, 0.95), symbol >= 3 chars in record text = max(score, 0.88). Matches if score is >= 0.84.",
+      "matching_strategy_resolution": "Filters and ranks all AFM register records using the search scoring logic."
+    },
+    {
+      "provider_id": "norway_newsweb",
+      "market": "Oslo Børs",
+      "connector_file": "oslo_newsweb.py",
+      "source_name": "oslo_newsweb",
+      "search_identifiers": ["isin", "market", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol"],
+      "native_identifiers": {
+        "oslo_issuer_id": "Euronext Oslo issuer ID (extracted from listview URLs)",
+        "newsweb_url": "Direct Oslo Newsweb URL",
+        "node_id": "Oslo Newsweb announcement node ID"
+      },
+      "matching_strategy_search": "Matches if notice company equals issuer name, notice company equals symbol, symbol in parentheses in title, or SequenceMatcher ratio >= 0.9 on clean names. Then checks that detail ISIN matches issuer ISIN.",
+      "matching_strategy_resolution": "Queries Euronext instruments using name/symbol, ranks results, parses heading on instrument product page, and extracts Euronext press release issuer ID or fallback ISIN."
+    },
+    {
+      "provider_id": "poland_knf",
+      "market": "Warsaw Stock Exchange",
+      "connector_file": "poland_knf_oam.py",
+      "source_name": "knf_oam",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "knf_oam_record_id": "KNF OAM notice record ID",
+        "knf_oam_name": "KNF OAM registered company name"
+      },
+      "matching_strategy_search": "Sends POST query with issuer name to field 'NazwaPodmiot'. Filters notices where normalized notice issuer name exactly matches issuer name.",
+      "matching_strategy_resolution": "Queries KNF OAM using issuer name, scores results (exact name = 90.0, inclusion = 80.0)."
+    },
+    {
+      "provider_id": "portugal_cmvm",
+      "market": "Euronext Lisbon",
+      "connector_file": "portugal_cmvm_sdi.py",
+      "source_name": "cmvm_sdi",
+      "search_identifiers": ["isin", "name", "symbol"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "portugal_cmvm_record_id": "Portuguese CMVM SDI notice record ID"
+      },
+      "matching_strategy_search": "Matches if notice isin_codes contains issuer.isin, or normalized name equals/inclusion/SequenceMatcher ratio >= 0.82, or symbol >= 3 chars is a word in notice name or title.",
+      "matching_strategy_resolution": "Compares notice names using SequenceMatcher * 100 (boosted to 90.0 if search match passes). Resolves to CMVM SDI record ID if score is >= 75.0."
+    },
+    {
+      "provider_id": "romania_asf",
+      "market": "Bucharest Stock Exchange",
+      "connector_file": "romania_asf_oam.py",
+      "source_name": "asf_oam",
+      "search_identifiers": ["isin", "name"],
+      "resolution_identifiers": ["isin", "name"],
+      "native_identifiers": {
+        "source_record_id": "Romania ASF OAM notice record ID"
+      },
+      "matching_strategy_search": "Fetches notices and matches if issuer.isin equals notice ISIN, or normalized issuer.name equals/inclusion matches notice issuer name.",
+      "matching_strategy_resolution": "Scores notices: ISIN or exact name match = 100.0, Name inclusion = 85.0. Resolves to ASF OAM record ID."
+    },
+    {
+      "provider_id": "slovakia_nbs",
+      "market": "Bratislava Stock Exchange",
+      "connector_file": "slovakia_nbs_ceri.py",
+      "source_name": "nbs_ceri",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Slovak NBS CERI record ID"
+      },
+      "matching_strategy_search": "Queries registry list using first part of issuer's name (pre-comma split).",
+      "matching_strategy_resolution": "Fetches listing, matches normalized notice issuer name (exact = 100.0, inclusion = 85.0)."
+    },
+    {
+      "provider_id": "slovenia_oam",
+      "market": "Ljubljana Stock Exchange",
+      "connector_file": "slovenia_oam.py",
+      "source_name": "slovenia_oam",
+      "search_identifiers": ["name"],
+      "resolution_identifiers": ["name"],
+      "native_identifiers": {
+        "source_record_id": "Slovenian OAM notice record ID"
+      },
+      "matching_strategy_search": "Filters recent feed documents where normalized candidate issuer name exactly matches issuer name.",
+      "matching_strategy_resolution": "Fetches listing, matches normalized notice issuer name (exact = 100.0, inclusion = 85.0)."
+    },
+    {
+      "provider_id": "spain_cnmv",
+      "market": "Bolsa de Madrid, Bolsa de Barcelona, Bolsa de Bilbao, Bolsa de Valencia, BME Growth, BME Scaleup",
+      "connector_file": "spain_cnmv.py",
+      "source_name": "spain_cnmv",
+      "search_identifiers": ["isin", "name", "spain_cnmv_nif"],
+      "resolution_identifiers": ["name", "symbol", "isin"],
+      "native_identifiers": {
+        "spain_cnmv_nif": "Spanish NIF (fiscal number starting with A/B/etc. used for direct entity searches)",
+        "spain_cnmv_record_id": "CNMV Entity record ID",
+        "spain_bme_company_url": "BME company profile page URL"
+      },
+      "matching_strategy_search": "Queries CNMV by entity name and filters results using the Spanish NIF. Inserts issuer.isin into document metadata if found.",
+      "matching_strategy_resolution": "POSTs name to search form, resolves CNIF (NIF) from select list options or results table, enriches with BME company URL using ticker symbol."
+    },
+    {
+      "provider_id": "sweden_fi",
+      "market": "Nasdaq Stockholm, Nordic Growth Market",
+      "connector_file": "sweden_fi.py",
+      "source_name": "sweden_fi",
+      "search_identifiers": ["isin", "name"],
+      "resolution_identifiers": ["symbol", "name", "isin"],
+      "native_identifiers": {
+        "sweden_fi_record_id": "Swedish FI notice record ID",
+        "sweden_nasdaq_company_url": "Nasdaq Stockholm company page URL"
+      },
+      "matching_strategy_search": "Queries the Swedish FI documents list by name and filters the returned items by ISIN.",
+      "matching_strategy_resolution": "POSTs the ISIN or name to Sweden FI Search.aspx. Resolves to the first match and enriches with Nasdaq company URL using symbol/isin."
+    }
+  ]
+}

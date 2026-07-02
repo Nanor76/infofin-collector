@@ -68,6 +68,8 @@ POSITIVE_RULES = (
             "half-yearly financial report",
             "half yearly financial report",
             "halvårsrapport",
+            "halvår",
+            "halvaar",
         ),
     ),
     ("quarterly_report", ("quarterly report", "kvartalsrapport")),

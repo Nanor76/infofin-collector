@@ -36,6 +36,8 @@ OSLO_TITLE_TERMS = (
     "Annual report",
     "Financial report",
     "Årsrapport",
+    "Årsberetning",
+    "Årsregnskap",
     "Halvårsrapport",
     "Quarterly report",
     "ESEF",
@@ -88,11 +90,11 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
     extension = PurePosixPath(urlparse(url).path).suffix.casefold()
     combined = f"{normalized_title} {normalized_topic}"
 
-    if extension in {".xhtml", ".xht", ".zip"} or "esef" in combined:
-        return "esef"
     if (
         "quarterly report" in normalized_title
+        or "quarterly period" in normalized_title
         or re.search(r"\bq[1-4]\b", normalized_title)
+        or re.search(r"\b[1-4]q\b", normalized_title)
         or re.search(
             r"\b(?:first|second|third|fourth) quarter\b",
             normalized_title,
@@ -111,12 +113,16 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
         "annual report" in normalized_title
         or "annual financial" in normalized_title
         or "arsrapport" in normalized_title
+        or "arsberetning" in normalized_title
+        or "arsregnskap" in normalized_title
         or normalized_topic
         == normalize_text(OSLO_SOURCE_TOPICS[0])
     ):
         return "annual_financial_report"
     if "financial report" in combined:
         return "financial_report"
+    if extension in {".xhtml", ".xht", ".zip"} or "esef" in combined:
+        return "esef"
     return None
 
 

@@ -143,12 +143,9 @@ def test_connector_uses_one_cached_feed_and_matches_locally() -> None:
         for candidate in recent
     )
     assert {candidate.document_type for candidate in annual.candidates} == {
-        "annual financial report",
-        "annual financial report ESEF",
+        "annual_financial_report",
     }
-    assert half_year.candidates[0].document_type == (
-        "half-yearly financial report"
-    )
+    assert half_year.candidates[0].document_type == "half_year_financial_report"
     assert resolution.found is True
     assert resolution.austria_oekb_oam_id == "1041"
     assert resolution.match_score == 100

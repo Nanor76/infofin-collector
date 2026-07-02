@@ -94,6 +94,16 @@ def test_listing_and_detail_parsing() -> None:
             "Periodic regulated information",
             "quarterly_financial_report",
         ),
+        (
+            "Storent Holding AS interim report for 6 months of 2025",
+            "Periodic regulated information",
+            "half_year_financial_report",
+        ),
+        (
+            "JSC Development Finance Institution Altum unaudited interim condensed report for the six months period ending 30 June 2025",
+            "Periodic regulated information",
+            "half_year_financial_report",
+        ),
     ],
 )
 def test_periodic_classification(

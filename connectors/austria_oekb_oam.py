@@ -30,11 +30,11 @@ DEFAULT_ISSUER_LIST_URL = (
 )
 
 PERIODIC_TYPE_MAP = {
-    "EP_JFB": "annual financial report",
-    "EP_JFB_XBRL": "annual financial report ESEF",
-    "EP_HJFB": "half-yearly financial report",
-    "EP_HJFB_XBRL": "half-yearly financial report ESEF",
-    "EP_QUARTALBER": "quarterly report",
+    "EP_JFB": "annual_financial_report",
+    "EP_JFB_XBRL": "annual_financial_report",
+    "EP_HJFB": "half_year_financial_report",
+    "EP_HJFB_XBRL": "half_year_financial_report",
+    "EP_QUARTALBER": "quarterly_financial_report",
 }
 
 KNOWN_REJECTED_TYPES = {

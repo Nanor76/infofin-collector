@@ -41,13 +41,17 @@ NEGATIVE_TERMS = (
     "voting rights",
     "general meeting",
     "dividend announcement",
-    "corporate action",
     "investor presentation",
+    "presentation",
+    "investor conference",
+    "conference webinar",
+    "investor webinar",
+    "webinar",
+    "invitation",
     "press release",
     "financial calendar",
     "webcast",
     "factsheet",
-    "fund",
     "net asset value",
     "nav",
     "dashboard",
@@ -128,6 +132,18 @@ def classify_estonia_document(
         "second quarter",
         "third quarter",
         "fourth quarter",
+        "1st quarter",
+        "2nd quarter",
+        "3rd quarter",
+        "4th quarter",
+        "i quarter",
+        "ii quarter",
+        "iii quarter",
+        "iv quarter",
+        "3 months",
+        "three months",
+        "9 months",
+        "nine months",
         "vahearuanne",
         "q1",
         "q2",
@@ -139,6 +155,8 @@ def classify_estonia_document(
         "half-year",
         "semi annual",
         "semi-annual",
+        "6 months",
+        "six months",
         "poolaastaaruanne",
         "poolaasta",
     )
@@ -275,23 +293,38 @@ def extract_estonia_date_info(
                 for marker, month in (
                     ("q1", 3),
                     ("first quarter", 3),
+                    ("1st quarter", 3),
+                    ("i quarter", 3),
+                    ("3 months", 3),
+                    ("three months", 3),
                     ("q2", 6),
                     ("second quarter", 6),
+                    ("2nd quarter", 6),
+                    ("ii quarter", 6),
                     ("q3", 9),
                     ("third quarter", 9),
+                    ("3rd quarter", 9),
+                    ("iii quarter", 9),
+                    ("9 months", 9),
+                    ("nine months", 9),
                     ("q4", 12),
                     ("fourth quarter", 12),
+                    ("iv quarter", 12),
                 ):
                     if marker in normalized:
                         quarter_month = month
                         break
                 if quarter_month:
-                    period_end = date(
+                    inferred_period_end = date(
                         reporting_year,
                         quarter_month,
                         31 if quarter_month in {3, 12} else 30,
                     )
-                    reason += "; quarter end inferred from explicit quarter"
+                    if published_at and inferred_period_end > published_at:
+                        reason += "; inferred quarter end after publication ignored"
+                    else:
+                        period_end = inferred_period_end
+                        reason += "; quarter end inferred from explicit quarter"
 
     return {
         "published_at": published_at,

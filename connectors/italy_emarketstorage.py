@@ -105,13 +105,6 @@ def classify_italy_document(
     suffix = PurePosixPath(urlparse(url).path).suffix.casefold()
     category_kind = _category_kind(category)
 
-    if (
-        "esef" in title_norm
-        or "xbrl" in title_norm
-        or suffix in {".xhtml", ".xht", ".zip", ".xbri"}
-    ):
-        return "esef"
-
     if any(
         term in title_norm
         for term in (
@@ -119,11 +112,34 @@ def classify_italy_document(
             "collegio sindacale",
             "relazione della societa di revisione",
             "relazione societa di revisione",
+            "societa di revisione",
+            "relazione di revisione",
             "revisione contabile",
             "revisore",
         )
     ):
         return "audit_report"
+
+    if any(
+        term in title_norm
+        for term in (
+            "assemblea",
+            "shareholders meeting",
+            "minutes of the",
+            "verbale",
+            "odg",
+            "ordine del giorno",
+            "approva il bilancio",
+            "approvazione del bilancio",
+            "remunerazione",
+            "remuneration",
+            "governo societario",
+            "corporate governance",
+            "assetti proprietari",
+            "relazione illustrativa",
+        )
+    ):
+        return "other_regulatory_announcement"
 
     annual_terms = (
         "relazione finanziaria annuale",
@@ -131,7 +147,10 @@ def classify_italy_document(
         "annual financial report",
         "annual report",
         "bilancio d esercizio",
+        "bilancio di esercizio",
         "bilancio consolidato",
+        "bilancio esef",
+        "fascicolo di bilancio",
     )
     half_year_terms = (
         "relazione finanziaria semestrale",
@@ -157,6 +176,12 @@ def classify_italy_document(
         return "half_year_financial_report"
     if any(term in title_norm for term in interim_terms):
         return "quarterly_financial_report"
+    if (
+        "esef" in title_norm
+        or "xbrl" in title_norm
+        or suffix in {".xhtml", ".xht", ".zip", ".xbri"}
+    ):
+        return "esef"
     if category_kind == "annual":
         return "annual_financial_report"
     if category_kind == "half_year":
@@ -167,6 +192,17 @@ def classify_italy_document(
         return "financial_report"
     if "financial report" in title_norm:
         return "financial_report"
+    return None
+
+
+def _file_format(url: str) -> str | None:
+    suffix = PurePosixPath(urlparse(url).path).suffix.casefold()
+    if suffix == ".pdf":
+        return "pdf"
+    if suffix in {".xhtml", ".xht"}:
+        return "xhtml"
+    if suffix in {".zip", ".xbri"}:
+        return "zip"
     return None
 
 
@@ -971,6 +1007,7 @@ class ItalyEmarketStorageConnector(Connector):
                         "detail_url": notice.detail_url,
                         "protocol": notice.protocol,
                         "provider": "emarketstorage",
+                        "file_format": _file_format(notice.document_url),
                     },
                 )
             )
@@ -1026,6 +1063,7 @@ class ItalyEmarketStorageConnector(Connector):
                         "category": notice.category,
                         "protocol": notice.protocol,
                         "detail_url": notice.detail_url,
+                        "file_format": _file_format(notice.document_url),
                     },
                 )
             )

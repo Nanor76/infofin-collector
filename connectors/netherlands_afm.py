@@ -126,12 +126,6 @@ def classify_afm_document(
     suffix = PurePosixPath(urlparse(filename).path).suffix.casefold()
     if suffix not in SUPPORTED_SUFFIXES:
         return None
-    if (
-        suffix in {".xhtml", ".xht", ".zip", ".xbri"}
-        or "esef" in combined
-        or "xhtml" in combined
-    ):
-        return "esef"
     if any(
         term in combined
         for term in (
@@ -157,6 +151,23 @@ def classify_afm_document(
         return "annual_financial_report"
     if "financial report" in combined:
         return "financial_report"
+    if (
+        suffix in {".xhtml", ".xht", ".zip", ".xbri"}
+        or "esef" in combined
+        or "xhtml" in combined
+    ):
+        return "esef"
+    return None
+
+
+def _file_format(filename: str) -> str | None:
+    suffix = PurePosixPath(urlparse(filename).path).suffix.casefold()
+    if suffix == ".pdf":
+        return "pdf"
+    if suffix in {".xhtml", ".xht"}:
+        return "xhtml"
+    if suffix in {".zip", ".xbri"}:
+        return "zip"
     return None
 
 
@@ -1074,6 +1085,7 @@ class NetherlandsAfmConnector(Connector):
                             "reporting_year": record.reporting_year,
                             "document_type_afm": document.document_type,
                             "filename": document.filename,
+                            "file_format": _file_format(document.filename),
                             "detail_url": record.detail_url,
                             "afm_record_id": record.record_id,
                             "afm_issuer_url": (
@@ -1152,6 +1164,7 @@ class NetherlandsAfmConnector(Connector):
                     "issuer_symbol": None,
                     "detail_url": record.detail_url,
                     "afm_record_id": record.record_id,
+                    "file_format": _file_format(record.filename or ""),
                 },
             )
             for record in records[:candidate_limit]
@@ -1198,6 +1211,7 @@ class NetherlandsAfmConnector(Connector):
                         "reporting_year": record.reporting_year,
                         "document_type_afm": document.document_type,
                         "filename": document.filename,
+                        "file_format": _file_format(document.filename),
                         "detail_url": record.detail_url,
                         "afm_record_id": record.record_id,
                         "afm_issuer_url": (

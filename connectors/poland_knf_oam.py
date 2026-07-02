@@ -41,6 +41,65 @@ PERIODIC_LABELS = {
     "QSR": "consolidated quarterly financial report",
 }
 
+TITLE_FALLBACK_CODES = frozenset({"RB-W", "RB-W_ASO", "UNI-EN", "UNI-PL"})
+TITLE_NEGATIVE_TERMS = (
+    "bond",
+    "bonds",
+    "isin",
+    "revenue",
+    "revenues",
+    "sales",
+    "sprzedaz",
+    "przychod",
+    "dywidend",
+    "dividend",
+    "announces date",
+    "publication date",
+    "date for",
+    "operations update",
+    "zmiana terminu",
+    "terminu przekazania",
+    "preliminary",
+    "wstepna",
+    "szacunk",
+)
+
+ANNUAL_TITLE_TERMS = (
+    "annual financial report",
+    "annual report",
+    "audited annual financial report",
+    "consolidated annual financial report",
+    "raport roczny",
+    "roczne sprawozdanie finansowe",
+)
+
+HALF_YEAR_TITLE_TERMS = (
+    "half year financial report",
+    "half year report",
+    "half yearly financial report",
+    "h1 report",
+    "h1 financial report",
+    "polroczne sprawozdanie finansowe",
+    "polroczny raport",
+    "i polrocze",
+)
+
+QUARTERLY_TITLE_TERMS = (
+    "quarterly financial report",
+    "quarterly report",
+    "consolidated report q1",
+    "consolidated report q2",
+    "consolidated report q3",
+    "consolidated report q4",
+    "report q1",
+    "report q2",
+    "report q3",
+    "report q4",
+    "interim financial statements",
+    "raport kwartal",
+    "raportu kwartal",
+)
+
 
 def _normalize(value: object) -> str:
     decomposed = unicodedata.normalize("NFKD", str(value or ""))
@@ -105,6 +164,99 @@ def classify_poland_document(
         [],
         [code] if code else [],
     )
+
+
+def _matched_terms(text: str, terms: tuple[str, ...]) -> list[str]:
+    return sorted(
+        term
+        for term in terms
+        if _normalize(term) and _normalize(term) in text
+    )
+
+
+def classify_poland_notice(
+    report_code: str,
+    title: str = "",
+    filename: str = "",
+) -> tuple[str, str, list[str], list[str]]:
+    document_type, reason, positive, negative = classify_poland_document(
+        report_code
+    )
+    if document_type != "other_regulatory_announcement":
+        return document_type, reason, positive, negative
+
+    code = (report_code or "").strip().upper()
+    if code not in TITLE_FALLBACK_CODES:
+        return document_type, reason, positive, negative
+
+    title_text = _normalize(title)
+    text = _normalize(f"{title} {filename}")
+    matched_negative = _matched_terms(text, TITLE_NEGATIVE_TERMS)
+    if matched_negative:
+        return (
+            "other_regulatory_announcement",
+            f"KNF OAM title fallback exclusion: {matched_negative[0]}",
+            [],
+            [code, matched_negative[0]] if code else [matched_negative[0]],
+        )
+
+    for inferred_type, terms in (
+        ("annual_financial_report", ANNUAL_TITLE_TERMS),
+        ("half_year_financial_report", HALF_YEAR_TITLE_TERMS),
+    ):
+        matched = _matched_terms(text, terms)
+        if matched:
+            return (
+                inferred_type,
+                f"KNF OAM title fallback periodic report term: {matched[0]}",
+                [code, matched[0]] if code else [matched[0]],
+                [],
+            )
+
+    if re.search(r"\bh1\b", title_text) and any(
+        term in title_text
+        for term in ("financial report", "financial statements", "report")
+    ):
+        return (
+            "half_year_financial_report",
+            "KNF OAM title fallback H1 report marker",
+            [code, "h1"] if code else ["h1"],
+            [],
+        )
+
+    matched_quarterly = _matched_terms(text, QUARTERLY_TITLE_TERMS)
+    if matched_quarterly:
+        return (
+            "quarterly_financial_report",
+            (
+                "KNF OAM title fallback periodic report term: "
+                f"{matched_quarterly[0]}"
+            ),
+            [code, matched_quarterly[0]] if code else [matched_quarterly[0]],
+            [],
+        )
+
+    has_quarter = re.search(r"\bq[1-4]\b|\b[1-4]q\b|\b9m\b", text)
+    has_report_context = any(
+        term in text
+        for term in (
+            "financial report",
+            "financial statements",
+            "consolidated report",
+            "management report",
+            "raport kwartal",
+            "sprawozdanie finansowe",
+        )
+    )
+    if has_quarter and has_report_context:
+        return (
+            "quarterly_financial_report",
+            "KNF OAM title fallback quarterly report marker",
+            [code, "quarterly_title_marker"] if code else ["quarterly_title_marker"],
+            [],
+        )
+
+    return document_type, reason, positive, negative
 
 
 @dataclass(frozen=True, slots=True)
@@ -612,7 +764,11 @@ class PolandKnfOamConnector(Connector):
 
     def _candidate(self, notice: PolandNotice) -> DocumentCandidate:
         document_type, reason, positive, negative = (
-            classify_poland_document(notice.report_code)
+            classify_poland_notice(
+                notice.report_code,
+                notice.title,
+                notice.filename,
+            )
         )
         code_key = notice.report_code.upper()
         source_title = notice.title.strip(" -")
@@ -730,7 +886,11 @@ class PolandKnfOamConnector(Connector):
             return [candidate]
         detail = self._detail(candidate)
         document_type, reason, positive, negative = (
-            classify_poland_document(detail.report_code)
+            classify_poland_notice(
+                detail.report_code,
+                detail.title or candidate.title,
+                detail.filename or str(candidate.metadata.get("filename") or ""),
+            )
         )
         metadata = dict(candidate.metadata)
         metadata.update(

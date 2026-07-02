@@ -16,6 +16,25 @@ def _url_extension(url: str) -> str:
     return PurePosixPath(urlparse(url).path).suffix.casefold()
 
 
+def _is_non_report_notice(text: str) -> bool:
+    if any(
+        marker in text
+        for marker in (
+            "aide-memoire",
+            "aide memoire",
+            "aide-memoire",
+            "report de la publication",
+            "report de publication",
+            "report publication",
+            "postponement of publication",
+            "delay of publication",
+            "delayed publication",
+        )
+    ):
+        return True
+    return False
+
+
 def classify_document(
     title: str,
     url: str = "",
@@ -24,6 +43,17 @@ def classify_document(
     text = _normalize(f"{title} {url}")
     extension = _url_extension(url)
     mime = (content_type or "").casefold().split(";", 1)[0].strip()
+
+    if _is_non_report_notice(text):
+        return None
+
+    if (
+        "universal registration document" in text
+        or "document d'enregistrement universel" in text
+        or "document d enregistrement universel" in text
+        or re.search(r"\b(?:urd|deu)\b", text)
+    ):
+        return "universal_registration_document"
 
     if (
         "rapport financier semestriel" in text
@@ -77,14 +107,6 @@ def classify_document(
 
     if "financial report" in text:
         return "financial_report"
-
-    if (
-        "universal registration document" in text
-        or "document d'enregistrement universel" in text
-        or "document d enregistrement universel" in text
-        or re.search(r"\b(?:urd|deu)\b", text)
-    ):
-        return "universal_registration_document"
 
     if (
         "esef" in text

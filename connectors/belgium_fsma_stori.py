@@ -94,6 +94,24 @@ def _file_type(value: str, filename: str = "") -> str | None:
 def _financial_type(topic: str, title: str, filename: str = "") -> str | None:
     combined = f"{topic} {title} {filename}"
     normalized = _normalize(combined)
+    title_normalized = _normalize(f"{title} {filename}")
+    if any(
+        marker in title_normalized
+        for marker in (
+            "press release",
+            "communique de presse",
+            "persbericht",
+        )
+    ) and not any(
+        marker in title_normalized
+        for marker in (
+            "annual financial report",
+            "rapport financier annuel",
+            "jaarverslag",
+            "annual report",
+        )
+    ):
+        return "other_regulatory_announcement"
     if any(
         marker in normalized
         for marker in (

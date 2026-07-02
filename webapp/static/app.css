@@ -1356,16 +1356,21 @@ input::placeholder {
 
 .results-table th:nth-child(4),
 .results-table td:nth-child(4) {
-  width: 145px; /* Type */
+  width: 170px; /* LEI */
 }
 
 .results-table th:nth-child(5),
 .results-table td:nth-child(5) {
-  width: auto; /* Titre (grows to fill remaining space) */
+  width: 145px; /* Type */
 }
 
 .results-table th:nth-child(6),
 .results-table td:nth-child(6) {
+  width: auto; /* Titre (grows to fill remaining space) */
+}
+
+.results-table th:nth-child(7),
+.results-table td:nth-child(7) {
   width: 75px; /* Actions */
   text-align: right;
 }
