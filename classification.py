@@ -70,6 +70,9 @@ def classify_document(
         or "publicacao de contas semestrais" in text
         or "relatorio e contas do 1 semestre" in text
         or "relatorio e contas do 1 o semestre" in text
+        or "informe financiero semestral" in text
+        or "informe semestral" in text
+        or "cuentas semestrales" in text
         or "half-yearly report" in text
         or "half yearly report" in text
         or "interim report" in text
@@ -79,6 +82,9 @@ def classify_document(
 
     if (
         "rapport financier annuel" in text
+        or "informe financiero anual" in text
+        or "informe anual" in text
+        or "cuentas anuales" in text
         or "annual financial report" in text
         or "annual report" in text
         or "jaarverslag" in text
@@ -97,7 +103,9 @@ def classify_document(
 
     if (
         "quarterly report" in text
+        or "informe trimestral" in text
         or re.search(r"\bq[1-4]\b", text)
+        or re.search(r"\b[1-4]q\b", text)
         or re.search(
             r"\b(?:first|second|third|fourth) quarter\b",
             text,

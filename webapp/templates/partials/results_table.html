@@ -83,9 +83,25 @@
         </th>
 
         <!-- LEI column -->
-        <th>
+        {% if cur_sort == 'issuer_lei' %}
+          {% set next_sort, sort_icon = '-issuer_lei', 'arrow-up' %}
+        {% elif cur_sort == '-issuer_lei' %}
+          {% set next_sort, sort_icon = 'issuer_lei', 'arrow-down' %}
+        {% else %}
+          {% set next_sort, sort_icon = 'issuer_lei', 'arrow-up-down' %}
+        {% endif %}
+        <th class="sortable"
+            hx-get="/partials/searches/{{ job_id }}/results"
+            hx-include="#results-filters"
+            hx-target="#results-table"
+            hx-vals='{"sort": "{{ next_sort }}"}'
+            hx-swap="innerHTML"
+            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            title="Trier par LEI"
+        >
           <div class="header-sort-wrapper">
             <span>LEI</span>
+            <i data-lucide="{{ sort_icon }}" class="sort-icon {% if sort_icon == 'arrow-up-down' %}muted{% else %}active{% endif %}"></i>
           </div>
         </th>
 

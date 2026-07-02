@@ -23,6 +23,8 @@ _SORT_WHITELIST = {
     "-document_type": "document_type COLLATE NOCASE DESC",
     "issuer_name": "issuer_name COLLATE NOCASE ASC",
     "-issuer_name": "issuer_name COLLATE NOCASE DESC",
+    "issuer_lei": "issuer_lei COLLATE NOCASE ASC",
+    "-issuer_lei": "issuer_lei COLLATE NOCASE DESC",
 }
 
 
@@ -104,7 +106,7 @@ def _document_to_row(job_id: str, document: LinkSearchDocument) -> dict[str, obj
     }
 
 
-def _enrich_row_lei(connection, row: dict[str, object]) -> None:
+def _enrich_row_lei(connection, row: dict[str, object], database: Database) -> None:
     if row.get("issuer_lei"):
         return
     isin = row.get("issuer_isin")
@@ -112,7 +114,7 @@ def _enrich_row_lei(connection, row: dict[str, object]) -> None:
     if not isin and not name:
         return
 
-    # 1. Try local database lookup first
+    # 1. Try local database lookup first (extremely fast)
     try:
         if isin:
             db_row = connection.execute(
@@ -131,23 +133,26 @@ def _enrich_row_lei(connection, row: dict[str, object]) -> None:
     except sqlite3.OperationalError:
         pass
 
-    # 2. If not found in DB, try to resolve via GLEIF (cache first, then live API)
+    # 2. Check local memory/file cache (fast, no network)
     try:
-        import requests
         import lei_resolver
-        with requests.Session() as session:
-            lei = lei_resolver.resolve_lei(isin, name, session)
-            if lei:
-                row["issuer_lei"] = lei
-                # Also save it to the database for persistence
-                if isin:
-                    try:
-                        connection.execute(
-                            "UPDATE issuers SET lei = ?, updated_at = ? WHERE isin = ?",
-                            (lei, date.today().isoformat(), isin)
-                        )
-                    except sqlite3.OperationalError:
-                        pass
+        cache = lei_resolver.load_lei_cache()
+        isin_key = isin.upper().strip() if isin else None
+        name_key = name.upper().strip() if name else None
+        
+        if isin_key and isin_key in cache:
+            row["issuer_lei"] = cache[isin_key]
+            return
+        if name_key and name_key in cache:
+            row["issuer_lei"] = cache[name_key]
+            return
+    except Exception:
+        pass
+
+    # 3. If still not found, queue background resolution (non-blocking)
+    try:
+        import lei_resolver
+        lei_resolver.queue_background_resolution(database, isin, name)
     except Exception:
         pass
 
@@ -307,7 +312,7 @@ class WebSearchRepository:
                         continue
 
                 row = _document_to_row(job_id, document)
-                _enrich_row_lei(connection, row)
+                _enrich_row_lei(connection, row, self.database)
                 connection.execute(
                     """
                     INSERT INTO web_search_results(
@@ -344,7 +349,7 @@ class WebSearchRepository:
             )
             for document in documents:
                 row = _document_to_row(job_id, document)
-                _enrich_row_lei(connection, row)
+                _enrich_row_lei(connection, row, self.database)
                 connection.execute(
                     """
                     INSERT INTO web_search_results(
