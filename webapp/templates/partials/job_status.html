@@ -3,6 +3,7 @@
   class="job-status status-{{ status.status }}"
   data-status="{{ status.status }}"
   data-terminal="{{ 'true' if status.status in terminal_statuses else 'false' }}"
+  data-testid="results-job-status"
 >
   <!-- Summary Stat Cards -->
   <div class="status-summary-grid">
@@ -21,7 +22,7 @@
       </div>
       <div class="stat-details">
         <span class="stat-label">Statut de la recherche</span>
-        <span class="stat-value text-capitalize">
+        <span class="stat-value text-capitalize" data-testid="results-job-state">
           {% if status.status == "running" %}
             En cours
           {% elif status.status == "done" %}
@@ -46,42 +47,42 @@
       </div>
       <div class="stat-details">
         <span class="stat-label">Total indexé</span>
-        <span class="stat-value">{{ status.results_count }}</span>
+        <span class="stat-value" data-testid="results-job-indexed-count">{{ status.results_count }}</span>
       </div>
     </div>
   </div>
 
   <!-- Loading Animation for Running State -->
   {% if status.status == "running" %}
-  <div class="search-progress-bar">
+  <div class="search-progress-bar" data-testid="results-job-progress">
     <div class="progress-bar-fill"></div>
   </div>
   {% endif %}
 
   <!-- Alerts / Warnings / Errors -->
   {% if status.warnings %}
-  <div class="dashboard-alert warning-alert">
+  <div class="dashboard-alert warning-alert" data-testid="results-job-warnings">
     <div class="alert-icon-title">
       <i data-lucide="alert-triangle"></i>
       <h3>Avertissements ({{ status.warnings|length }})</h3>
     </div>
     <div class="alert-messages">
       {% for warning in status.warnings %}
-      <p>{{ warning }}</p>
+      <p data-testid="results-job-warning-message">{{ warning }}</p>
       {% endfor %}
     </div>
   </div>
   {% endif %}
 
   {% if status.errors %}
-  <div class="dashboard-alert error-alert">
+  <div class="dashboard-alert error-alert" data-testid="results-job-errors">
     <div class="alert-icon-title">
       <i data-lucide="x-octagon"></i>
       <h3>Erreurs ({{ status.errors|length }})</h3>
     </div>
     <div class="alert-messages">
       {% for error in status.errors %}
-      <p>{{ error }}</p>
+      <p data-testid="results-job-error-message">{{ error }}</p>
       {% endfor %}
     </div>
   </div>
@@ -89,14 +90,14 @@
 
   <!-- Markets Run Status list -->
   {% if status.markets %}
-  <div class="market-runs-section">
+  <div class="market-runs-section" data-testid="results-market-runs">
     <h3>État par source et marché</h3>
     <div class="market-runs-grid">
       {% for run in status.markets %}
-      <div class="market-run-badge-card status-border-{{ run.status }}">
+      <div class="market-run-badge-card status-border-{{ run.status }}" data-testid="results-market-run">
         <div class="run-card-header">
-          <span class="run-market-name">{{ run.market }}</span>
-          <span class="run-status-indicator status-text-{{ run.status }}">
+          <span class="run-market-name" data-testid="results-market-run-name">{{ run.market }}</span>
+          <span class="run-status-indicator status-text-{{ run.status }}" data-testid="results-market-run-status">
             {% if run.status == "ok" %}
             <i data-lucide="check-circle" class="run-status-icon"></i>
             {% elif run.status == "running" %}
@@ -110,20 +111,20 @@
         <div class="run-card-body">
           <div class="run-stat-row">
             <span class="run-stat-label">Source</span>
-            <span class="run-stat-val font-mono">{{ run.source or "N/A" }}</span>
+            <span class="run-stat-val font-mono" data-testid="results-market-run-source">{{ run.source or "N/A" }}</span>
           </div>
           <div class="run-stat-row">
             <span class="run-stat-label">Documents trouvés</span>
-            <span class="run-stat-val font-semibold">{{ run.results_count }}</span>
+            <span class="run-stat-val font-semibold" data-testid="results-market-run-count">{{ run.results_count }}</span>
           </div>
           {% if run.warning %}
-          <div class="run-card-message warning">
+          <div class="run-card-message warning" data-testid="results-market-run-warning">
             <i data-lucide="alert-triangle"></i>
             <span>{{ run.warning }}</span>
           </div>
           {% endif %}
           {% if run.error %}
-          <div class="run-card-message error">
+          <div class="run-card-message error" data-testid="results-market-run-error">
             <i data-lucide="alert-circle"></i>
             <span>{{ run.error }}</span>
           </div>

@@ -1087,6 +1087,7 @@ class BelgiumFsmaStoriConnector(Connector):
                 notice.published_date is None
                 or notice.published_date >= cutoff
             )
+            and self._market_matches(notice)
         ]
         self._scanned_notices = len(notices)
         candidates: list[DocumentCandidate] = []

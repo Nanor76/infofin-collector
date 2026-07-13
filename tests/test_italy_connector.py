@@ -184,6 +184,21 @@ def test_classification_keywords_and_categories() -> None:
         classify_italy_document("Relazione di revisione al bilancio chiuso al 31.12.2025", "1.1")
         == "audit_report"
     )
+    assert (
+        classify_italy_document(
+            "Analyst presentation - 3M results as at 31 march 2026",
+            "1.2",
+        )
+        == "other_regulatory_announcement"
+    )
+    assert (
+        classify_italy_document(
+            "Draft statutory annual financial statements and consolidated annual financial statements",
+            "1.1",
+            "https://official.test/report.xhtml",
+        )
+        == "annual_financial_report"
+    )
     assert classify_italy_document("Comunicato ordinario") is None
 
 

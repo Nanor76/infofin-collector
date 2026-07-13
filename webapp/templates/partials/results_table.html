@@ -1,15 +1,15 @@
-<div class="results-meta">
+<div class="results-meta" data-testid="results-summary">
   <div class="meta-left">
     <i data-lucide="database" class="meta-icon"></i>
-    <span><strong>{{ total }}</strong> document(s) correspondant aux filtres</span>
+    <span><strong data-testid="results-total-count">{{ total }}</strong> document(s) correspondant aux filtres</span>
   </div>
   <div class="meta-right">
-    <span>Page <strong>{{ page }}</strong> sur <strong>{{ total_pages }}</strong></span>
+    <span>Page <strong data-testid="results-current-page">{{ page }}</strong> sur <strong data-testid="results-total-pages">{{ total_pages }}</strong></span>
   </div>
 </div>
 
 <div class="table-scroll-container">
-  <table class="results-table">
+  <table class="results-table" data-testid="results-table">
     <thead>
       <tr>
         <!-- Date column -->
@@ -27,8 +27,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par date"
+            data-testid="results-sort-published-at"
         >
           <div class="header-sort-wrapper">
             <span>Date</span>
@@ -50,8 +51,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par marché"
+            data-testid="results-sort-market"
         >
           <div class="header-sort-wrapper">
             <span>Marché</span>
@@ -73,8 +75,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par société"
+            data-testid="results-sort-issuer-name"
         >
           <div class="header-sort-wrapper">
             <span>Société</span>
@@ -96,8 +99,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par LEI"
+            data-testid="results-sort-issuer-lei"
         >
           <div class="header-sort-wrapper">
             <span>LEI</span>
@@ -119,8 +123,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par type de document"
+            data-testid="results-sort-document-type"
         >
           <div class="header-sort-wrapper">
             <span>Type</span>
@@ -142,8 +147,9 @@
             hx-target="#results-table"
             hx-vals='{"sort": "{{ next_sort }}"}'
             hx-swap="innerHTML"
-            hx-on:click="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
+            onclick="document.querySelector('#results-filters input[name=sort]').value = '{{ next_sort }}';"
             title="Trier par titre de document"
+            data-testid="results-sort-title"
         >
           <div class="header-sort-wrapper">
             <span>Titre du document</span>
@@ -157,17 +163,17 @@
     </thead>
     <tbody>
       {% for row in results %}
-      <tr>
-        <td class="date-cell">
+      <tr data-testid="results-document-row">
+        <td class="date-cell" data-testid="results-document-published-at">
           <div class="date-wrapper">
             <i data-lucide="calendar" class="cell-icon-small"></i>
             <span>{{ row.get("published_at") or "" }}</span>
           </div>
         </td>
-        <td><span class="market-badge" title="{{ row.get('market') or '' }}">{{ row.get("market") or "" }}</span></td>
-        <td class="issuer-cell font-semibold">{{ row.get("issuer_name") or "" }}</td>
-        <td class="lei-cell font-mono text-xs">{{ row.get("issuer_lei") or "" }}</td>
-        <td>
+        <td data-testid="results-document-market"><span class="market-badge" title="{{ row.get('market') or '' }}">{{ row.get("market") or "" }}</span></td>
+        <td class="issuer-cell font-semibold" data-testid="results-document-issuer-name">{{ row.get("issuer_name") or "" }}</td>
+        <td class="lei-cell font-mono text-xs" data-testid="results-document-issuer-lei">{{ row.get("issuer_lei") or "" }}</td>
+        <td data-testid="results-document-type">
           {% set doc_type = row.get("document_type") or "" %}
           <span class="badge badge-doc-{{ doc_type }}">
             {% if doc_type == "annual_financial_report" %}
@@ -187,13 +193,13 @@
             {% endif %}
           </span>
         </td>
-        <td class="title-cell" title="{{ row.get('title') or '' }}">{{ row.get("title") or "" }}</td>
-        <td class="actions">
+        <td class="title-cell" title="{{ row.get('title') or '' }}" data-testid="results-document-title">{{ row.get("title") or "" }}</td>
+        <td class="actions" data-testid="results-document-actions">
           <div class="actions-group-vertical">
-            <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-action-small open-btn" title="Ouvrir le document dans un nouvel onglet">
+            <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-action-small open-btn" title="Ouvrir le document dans un nouvel onglet" data-testid="results-document-open-link">
               <i data-lucide="external-link"></i>
             </a>
-            <button type="button" class="btn-action-small copy-link" data-url="{{ row.get('url') or '' }}" title="Copier le lien du document dans le presse-papiers">
+            <button type="button" class="btn-action-small copy-link" data-url="{{ row.get('url') or '' }}" title="Copier le lien du document dans le presse-papiers" data-testid="results-document-copy-link-button">
               <i data-lucide="copy"></i>
             </button>
           </div>
@@ -202,7 +208,7 @@
       {% else %}
       <tr>
         <td colspan="7" class="empty-row">
-          <div class="empty-state">
+          <div class="empty-state" data-testid="results-empty-state">
             <i data-lucide="search-code" class="empty-icon"></i>
             <p>Aucun document ne correspond à vos filtres.</p>
           </div>
@@ -214,7 +220,7 @@
 </div>
 
 {% if total_pages > 1 %}
-<nav class="pagination">
+<nav class="pagination" data-testid="results-pagination">
   {% if page > 1 %}
   <button
     type="button"
@@ -224,18 +230,19 @@
     hx-include="#results-filters"
     hx-target="#results-table"
     hx-swap="innerHTML"
+    data-testid="results-pagination-previous-button"
   >
     <i data-lucide="chevron-left"></i>
     <span>Précédent</span>
   </button>
   {% else %}
-  <span class="btn-pagination-prev disabled">
+  <span class="btn-pagination-prev disabled" data-testid="results-pagination-previous-disabled">
     <i data-lucide="chevron-left"></i>
     <span>Précédent</span>
   </span>
   {% endif %}
   
-  <div class="pagination-info">
+  <div class="pagination-info" data-testid="results-pagination-summary">
     <span>Page {{ page }} / {{ total_pages }}</span>
   </div>
 
@@ -248,12 +255,13 @@
     hx-include="#results-filters"
     hx-target="#results-table"
     hx-swap="innerHTML"
+    data-testid="results-pagination-next-button"
   >
     <span>Suivant</span>
     <i data-lucide="chevron-right"></i>
   </button>
   {% else %}
-  <span class="btn-pagination-next disabled">
+  <span class="btn-pagination-next disabled" data-testid="results-pagination-next-disabled">
     <span>Suivant</span>
     <i data-lucide="chevron-right"></i>
   </span>

@@ -60,7 +60,14 @@ class JobManager:
         
         # Count final documents per market (after deduplication/filtering)
         final_counts = {}
+        enriched_documents = []
         for doc in result_set.documents:
+            db_market = self.repository.resolve_issuer_market(
+                doc.issuer_isin, doc.issuer_name
+            )
+            if db_market:
+                doc = replace(doc, market=db_market)
+            enriched_documents.append(doc)
             for m in doc.market.split(","):
                 m_clean = m.strip()
                 final_counts[m_clean] = final_counts.get(m_clean, 0) + 1
@@ -71,8 +78,8 @@ class JobManager:
             updated_summary = replace(summary, documents_count=final_count)
             self.repository.upsert_market_run(job_id, updated_summary)
             
-        self.repository.replace_results(job_id, result_set.documents)
-        if result_set.errors and result_set.documents:
+        self.repository.replace_results(job_id, enriched_documents)
+        if result_set.errors and enriched_documents:
             status = "partial"
         elif result_set.errors:
             status = "failed"
@@ -81,7 +88,7 @@ class JobManager:
         self.repository.finish_job(
             job_id,
             status=status,
-            results_count=len(result_set.documents),
+            results_count=len(enriched_documents),
             warnings=result_set.warnings,
             errors=result_set.errors,
         )

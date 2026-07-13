@@ -10,21 +10,21 @@
 {% set terminal_statuses = ["done", "partial", "failed", "cancelled"] %}
 {% set is_terminal = status.status in terminal_statuses %}
 
-<div class="results-container">
+<div class="results-container" data-testid="results-page">
   <!-- Top Navigation & Actions -->
-  <div class="results-top-nav">
-    <a href="/" class="btn-back">
+  <div class="results-top-nav" data-testid="results-toolbar">
+    <a href="/" class="btn-back" data-testid="results-new-search-link">
       <i data-lucide="arrow-left"></i>
       <span>Nouvelle recherche</span>
     </a>
     
-    <div class="export-actions">
+    <div class="export-actions" data-testid="results-export-actions">
       <span class="export-label">Exporter :</span>
-      <a class="btn-export csv" href="/api/searches/{{ job_id }}/export?format=csv">
+      <a class="btn-export csv" href="/api/searches/{{ job_id }}/export?format=csv" data-testid="results-export-csv-link">
         <i data-lucide="file-spreadsheet"></i>
         <span>CSV</span>
       </a>
-      <a class="btn-export json" href="/api/searches/{{ job_id }}/export?format=json">
+      <a class="btn-export json" href="/api/searches/{{ job_id }}/export?format=json" data-testid="results-export-json-link">
         <i data-lucide="braces"></i>
         <span>JSON</span>
       </a>
@@ -32,7 +32,7 @@
   </div>
 
   <!-- Status Section Card -->
-  <div class="dashboard-card status-card">
+  <div class="dashboard-card status-card" data-testid="results-status-section">
     <div class="card-header">
       <div class="header-title">
         <i data-lucide="activity" class="header-icon pulse-icon"></i>
@@ -46,13 +46,14 @@
       hx-trigger="load, every 2s"
       hx-swap="innerHTML"
       class="job-status-wrapper"
+      data-testid="results-status-region"
     >
       {% include "partials/job_status.html" %}
     </div>
   </div>
 
   <!-- Filters & Results Card -->
-  <div class="dashboard-card results-card" id="results-panel">
+  <div class="dashboard-card results-card" id="results-panel" data-testid="results-panel">
     <div class="card-header">
       <div class="header-title">
         <i data-lucide="list-filter" class="header-icon"></i>
@@ -68,13 +69,14 @@
       hx-target="#results-table"
       hx-trigger="change, keyup delay:200ms, submit"
       hx-include="#results-filters"
+      data-testid="results-filter-form"
     >
       <input type="hidden" name="sort" value="-published_at">
       <div class="filters-grid">
         <div class="field">
           <label for="filter_document_type">Type de document</label>
           <div class="select-wrapper">
-            <select id="filter_document_type" name="document_type">
+            <select id="filter_document_type" name="document_type" data-testid="results-filter-document-type-select">
               <option value="">Tous les types</option>
               {% for value, label in document_types %}
               <option value="{{ value }}">{{ label }}</option>
@@ -87,7 +89,7 @@
           <label for="filter_market">Marché</label>
           <div class="input-with-icon">
             <i data-lucide="globe" class="input-icon"></i>
-            <input type="text" id="filter_market" name="market" placeholder="ex: Paris, Oslo...">
+            <input type="text" id="filter_market" name="market" placeholder="ex: Paris, Oslo..." data-testid="results-filter-market-input">
           </div>
         </div>
 
@@ -95,7 +97,7 @@
           <label for="filter_source">Source</label>
           <div class="input-with-icon">
             <i data-lucide="server" class="input-icon"></i>
-            <input type="text" id="filter_source" name="source" placeholder="ex: amf, newsweb...">
+            <input type="text" id="filter_source" name="source" placeholder="ex: amf, newsweb..." data-testid="results-filter-source-input">
           </div>
         </div>
 
@@ -103,7 +105,7 @@
           <label for="filter_q">Texte / Mots-clés</label>
           <div class="input-with-icon">
             <i data-lucide="search" class="input-icon"></i>
-            <input type="text" id="filter_q" name="q" placeholder="ex: Rapport, fusion...">
+            <input type="text" id="filter_q" name="q" placeholder="ex: Rapport, fusion..." data-testid="results-filter-query-input">
           </div>
         </div>
 
@@ -111,7 +113,7 @@
           <label for="filter_isin">Société (ISIN)</label>
           <div class="input-with-icon">
             <i data-lucide="hash" class="input-icon"></i>
-            <input type="text" id="filter_isin" name="issuer_isin" placeholder="ex: FR0000...">
+            <input type="text" id="filter_isin" name="issuer_isin" placeholder="ex: FR0000..." data-testid="results-filter-isin-input">
           </div>
         </div>
       </div>
@@ -121,6 +123,7 @@
     <div class="table-outer-wrapper">
       <div
         id="results-table"
+        data-testid="results-table-region"
         {% if not is_terminal %}
         hx-get="/partials/searches/{{ job_id }}/results"
         hx-trigger="load, every 2s [infofinShouldPollResults()]"

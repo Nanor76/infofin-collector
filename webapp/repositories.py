@@ -374,6 +374,28 @@ class WebSearchRepository:
                     row,
                 )
 
+    def resolve_issuer_market(self, isin: str | None, name: str | None) -> str | None:
+        if not isin and not name:
+            return None
+        try:
+            with self.database.connect() as connection:
+                if isin:
+                    row = connection.execute(
+                        "SELECT market FROM issuers WHERE isin = ?", (isin,)
+                    ).fetchone()
+                    if row and row["market"]:
+                        return row["market"]
+                if name:
+                    row = connection.execute(
+                        "SELECT market FROM issuers WHERE name = ? COLLATE NOCASE", (name,)
+                    ).fetchone()
+                    if row and row["market"]:
+                        return row["market"]
+        except sqlite3.OperationalError:
+            # Table 'issuers' might not exist (e.g. in test databases without full schema initialized)
+            pass
+        return None
+
     def count_results(self, job_id: str) -> int:
         with self.database.connect() as connection:
             row = connection.execute(

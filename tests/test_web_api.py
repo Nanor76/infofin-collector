@@ -25,6 +25,7 @@ class FakeJobManager:
         self.repository = repository
         self.job_id = "fakejob1234567890abcdef1234567890ab"
         self.running_job_id = "runningjob1234567890abcdef123456789"
+        self.alert_job_id = "alertjob1234567890abcdef12345678901"
         self.paginated_job_id = "pagejob1234567890abcdef1234567890ab"
         self._seed_job()
 
@@ -85,6 +86,32 @@ class FakeJobManager:
             ),
         )
         self.repository.mark_job_running(self.running_job_id)
+        self.repository.create_job(
+            self.alert_job_id,
+            LinkSearchRequest(
+                markets=("Euronext Paris",),
+                date_from=date(2026, 6, 1),
+                date_to=date(2026, 6, 30),
+            ),
+        )
+        self.repository.mark_job_running(self.alert_job_id)
+        self.repository.upsert_market_run(
+            self.alert_job_id,
+            MarketSearchSummary(
+                market="Euronext Paris",
+                source="fake-oam",
+                status="failed",
+                warning="Market warning",
+                error="Market error",
+            ),
+        )
+        self.repository.finish_job(
+            self.alert_job_id,
+            status="partial",
+            results_count=0,
+            warnings=("Job warning",),
+            errors=("Job error",),
+        )
         self.repository.create_job(
             self.paginated_job_id,
             LinkSearchRequest(
@@ -246,6 +273,51 @@ def test_get_home_contains_form(client: TestClient) -> None:
     assert "Lancer la recherche" in response.text
 
 
+def test_home_interactive_elements_have_test_ids(client: TestClient) -> None:
+    response = client.get("/")
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    assert not _interactive_elements_without_test_id(soup)
+    _assert_test_ids(
+        soup,
+        {
+            "layout-header",
+            "layout-home-link",
+            "layout-main",
+            "layout-footer",
+            "search-page",
+            "search-heading",
+            "search-form",
+            "search-market-section",
+            "search-market-list",
+            "search-market-option-oslo-bors",
+            "search-market-checkbox-oslo-bors",
+            "search-market-filter-input",
+            "search-market-select-all-button",
+            "search-market-select-none-button",
+            "search-map",
+            "search-map-loading",
+            "search-map-tooltip",
+            "search-map-zoom-in-button",
+            "search-map-zoom-out-button",
+            "search-map-reset-button",
+            "search-date-section",
+            "search-date-presets",
+            "search-date-preset-7-button",
+            "search-date-preset-30-button",
+            "search-date-preset-90-button",
+            "search-date-preset-365-button",
+            "search-date-preset-custom-button",
+            "search-date-from-input",
+            "search-date-to-input",
+            "search-document-type-section",
+            "search-document-type-option-annual-financial-report",
+            "search-document-type-checkbox-annual-financial-report",
+            "search-submit-button",
+        },
+    )
+
+
 def test_get_results_page_with_fake_job(client: TestClient) -> None:
     job_id = "fakejob1234567890abcdef1234567890ab"
     response = client.get(f"/searches/{job_id}")
@@ -255,6 +327,115 @@ def test_get_results_page_with_fake_job(client: TestClient) -> None:
     partial = client.get(f"/partials/searches/{job_id}/results")
     assert partial.status_code == 200
     assert 'rel="noopener noreferrer"' in partial.text
+
+
+def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
+    job_id = "pagejob1234567890abcdef1234567890ab"
+    responses = (
+        client.get(f"/searches/{job_id}"),
+        client.get(
+            f"/partials/searches/{job_id}/results",
+            params={"page": 1, "page_size": 50},
+        ),
+    )
+
+    for response in responses:
+        soup = BeautifulSoup(response.text, "html.parser")
+        assert not _interactive_elements_without_test_id(soup)
+
+    page_soup = BeautifulSoup(responses[0].text, "html.parser")
+    _assert_test_ids(
+        page_soup,
+        {
+            "layout-header",
+            "layout-main",
+            "layout-footer",
+            "results-page",
+            "results-toolbar",
+            "results-new-search-link",
+            "results-export-actions",
+            "results-export-csv-link",
+            "results-export-json-link",
+            "results-status-section",
+            "results-status-region",
+            "results-job-status",
+            "results-job-state",
+            "results-job-indexed-count",
+            "results-panel",
+            "results-filter-form",
+            "results-filter-document-type-select",
+            "results-filter-market-input",
+            "results-filter-source-input",
+            "results-filter-query-input",
+            "results-filter-isin-input",
+            "results-table-region",
+            "results-summary",
+            "results-total-count",
+            "results-current-page",
+            "results-total-pages",
+            "results-table",
+            "results-sort-published-at",
+            "results-sort-market",
+            "results-sort-issuer-name",
+            "results-sort-issuer-lei",
+            "results-sort-document-type",
+            "results-sort-title",
+            "results-document-row",
+            "results-document-published-at",
+            "results-document-market",
+            "results-document-issuer-name",
+            "results-document-issuer-lei",
+            "results-document-type",
+            "results-document-title",
+            "results-document-actions",
+            "results-document-open-link",
+            "results-document-copy-link-button",
+            "results-pagination",
+            "results-pagination-previous-disabled",
+            "results-pagination-summary",
+            "results-pagination-next-button",
+        },
+    )
+
+
+def test_results_conditional_states_have_test_ids(client: TestClient) -> None:
+    alert_response = client.get(
+        "/searches/alertjob1234567890abcdef12345678901"
+    )
+    alert_soup = BeautifulSoup(alert_response.text, "html.parser")
+    _assert_test_ids(
+        alert_soup,
+        {
+            "results-job-warnings",
+            "results-job-warning-message",
+            "results-job-errors",
+            "results-job-error-message",
+            "results-market-runs",
+            "results-market-run",
+            "results-market-run-name",
+            "results-market-run-status",
+            "results-market-run-source",
+            "results-market-run-count",
+            "results-market-run-warning",
+            "results-market-run-error",
+            "results-empty-state",
+        },
+    )
+
+    running_response = client.get(
+        "/searches/runningjob1234567890abcdef123456789"
+    )
+    running_soup = BeautifulSoup(running_response.text, "html.parser")
+    _assert_test_ids(running_soup, {"results-job-progress"})
+
+
+def test_dynamic_map_interactions_define_test_ids() -> None:
+    app_script = (
+        Path(__file__).parents[1] / "webapp" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "'search-map-canvas'" in app_script
+    assert "`search-map-country-${code.toLowerCase()}`" in app_script
 
 
 def test_terminal_results_page_does_not_auto_poll_results(
@@ -309,3 +490,54 @@ def test_results_pagination_uses_htmx_values_and_form_filters(
     assert next_button["hx-include"] == "#results-filters"
     assert '"page": 2' in next_button["hx-vals"]
     assert "?" not in next_button["hx-get"]
+
+    first_page_soup = soup
+    _assert_test_ids(
+        first_page_soup,
+        {
+            "results-pagination-previous-disabled",
+            "results-pagination-next-button",
+        },
+    )
+
+    last_page_response = client.get(
+        f"/partials/searches/{job_id}/results",
+        params={"page": 2, "page_size": 50},
+    )
+    last_page_soup = BeautifulSoup(last_page_response.text, "html.parser")
+    _assert_test_ids(
+        last_page_soup,
+        {
+            "results-pagination-previous-button",
+            "results-pagination-next-disabled",
+        },
+    )
+
+
+def _interactive_elements_without_test_id(
+    soup: BeautifulSoup,
+) -> list[object]:
+    selectors = (
+        "a",
+        "button",
+        'input:not([type="hidden"])',
+        "select",
+        "textarea",
+        "summary",
+        "[onclick]",
+        '[role="button"]',
+        '[contenteditable="true"]',
+    )
+    return [
+        element
+        for element in soup.select(", ".join(selectors))
+        if not element.has_attr("data-testid")
+    ]
+
+
+def _assert_test_ids(soup: BeautifulSoup, expected: set[str]) -> None:
+    actual = {
+        str(element["data-testid"])
+        for element in soup.select("[data-testid]")
+    }
+    assert expected <= actual, f"Missing data-testid values: {sorted(expected - actual)}"

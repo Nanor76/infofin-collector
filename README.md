@@ -305,7 +305,9 @@ Documentation de conception:
 - [`ARCHITECTURE_WEBAPP.md`](ARCHITECTURE_WEBAPP.md): architecture, modules,
   modèle de données, API, UI et critères MVP;
 - [`PLAN_DEVELOPPEMENT_WEBAPP.md`](PLAN_DEVELOPPEMENT_WEBAPP.md): plan de
-  développement détaillé, lots d'implémentation et tests.
+  développement détaillé, lots d'implémentation et tests;
+- [`TESTING.md`](TESTING.md): execution des tests, integrations live et
+  convention des `data-testid` Playwright.
 
 La cible est une application locale FastAPI + Jinja2/HTMX qui lance des jobs
 de recherche, affiche la progression par marché, permet de filtrer les liens
@@ -1021,26 +1023,8 @@ erreur est `success`; une erreur globale d'initialisation produit `failed`.
 
 ## Tests
 
-Les tests standards n'effectuent aucun appel réseau:
-
-```powershell
-python -m pytest -q
-```
-
-Le test d'intégration live est explicitement opt-in. Il vérifie un record
-réel, télécharge un document officiel, calcule son SHA256, l'écrit localement
-et contrôle son insertion SQLite:
-
-```powershell
-$env:RUN_LIVE_TESTS = "1"
-python -m pytest tests/test_france_live.py -q
-python -m pytest tests/test_oslo_live.py -q
-python -m pytest tests/test_italy_live.py -q
-python -m pytest tests/test_netherlands_live.py -q
-python -m pytest tests/test_belgium_live.py -q
-python -m pytest tests/test_portugal_live.py -q
-python -m pytest tests/test_ireland_live.py -q
-```
+Les commandes, les tests d'integration live et les conventions Playwright sont
+regroupes dans [`TESTING.md`](TESTING.md).
 
 ## Spain source discovery / troubleshooting
 
@@ -1076,15 +1060,6 @@ python main.py discover-issuer spain --symbol SAN --name "Banco Santander, S.A."
 python main.py watch --market "Bolsa de Madrid" --limit 10 --dry-run
 ```
 
-### Tests d'intégration Live
-
-Pour lancer le test d'intégration live pour le connecteur espagnol :
-
-```powershell
-$env:RUN_LIVE_TESTS = "1"
-python -m pytest tests/test_spain_watch.py -k "live" -q
-```
-
 ## Sweden source discovery / troubleshooting
 
 Le connecteur suédois interroge la base de données officielle de la Finansinspektionen (FI - Stock Exchange Information Database) pour récupérer les rapports financiers (rapports annuels, semestriels, trimestriels, etc.). Il interroge optionnellement le Nasdaq Stockholm pour enrichir la watchlist avec des informations complémentaires (symboles, URLs de sociétés).
@@ -1115,15 +1090,6 @@ python main.py discover-issuer sweden --symbol "ERIC B" --name "Ericsson, Telefo
 
 # Lancer une veille en mode simulation (dry-run)
 python main.py watch --market "Nasdaq Stockholm" --limit 10 --dry-run
-```
-
-### Tests d'intégration Live
-
-Pour lancer le test d'intégration live pour le connecteur suédois :
-
-```powershell
-$env:RUN_LIVE_TESTS = "1"
-python -m pytest tests/test_sweden_watch.py -k "live" -q
 ```
 
 ## Denmark source discovery / troubleshooting
@@ -1167,10 +1133,3 @@ Le Danemark est marqué `eu_candidate` pour le contrôle géographique PEA. Cela
 vaut jamais confirmation d'éligibilité : le domicile doit être confirmé depuis
 les données émetteur DFSA et aucun `pea_eligible=true` n'est déduit de la place
 de cotation.
-
-Test live opt-in :
-
-```powershell
-$env:RUN_LIVE_TESTS = "1"
-python -m pytest tests/test_denmark_connector.py -k "live" -q
-```

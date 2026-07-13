@@ -1,15 +1,15 @@
 {% extends "layout.html" %}
 {% block title %}Recherche — InfoFin{% endblock %}
 {% block content %}
-<div class="search-container">
+<div class="search-container" data-testid="search-page">
   <div class="search-hero">
-    <h1>Recherche de documents financiers</h1>
+    <h1 data-testid="search-heading">Recherche de documents financiers</h1>
     <p class="hero-subtitle">Interrogez les bases de données réglementaires et les OAM européens en temps réel.</p>
   </div>
 
-  <form id="search-form" class="search-form">
+  <form id="search-form" class="search-form" data-testid="search-form">
     <!-- Panel 1: Marchés -->
-    <div class="form-card market-selection-card">
+    <div class="form-card market-selection-card" data-testid="search-market-section">
       <div class="card-header-split">
         <div class="card-header">
           <i data-lucide="globe" class="header-icon"></i>
@@ -19,8 +19,8 @@
           </div>
         </div>
         <div class="market-quick-actions">
-          <button type="button" class="btn-quick" id="btn-select-all">Tous</button>
-          <button type="button" class="btn-quick" id="btn-select-none">Aucun</button>
+          <button type="button" class="btn-quick" id="btn-select-all" data-testid="search-market-select-all-button">Tous</button>
+          <button type="button" class="btn-quick" id="btn-select-none" data-testid="search-market-select-none-button">Aucun</button>
         </div>
       </div>
       
@@ -29,13 +29,13 @@
         <div class="market-list-container">
           <div class="market-search-wrapper">
             <i data-lucide="search" class="search-icon-inside"></i>
-            <input type="text" id="market-search" placeholder="Rechercher une ville, un marché...">
+            <input type="text" id="market-search" placeholder="Rechercher une ville, un marché..." data-testid="search-market-filter-input">
           </div>
           
-          <div class="market-list" id="market-checkbox-list">
+          <div class="market-list" id="market-checkbox-list" data-testid="search-market-list">
             {% for market in markets %}
-            <label class="market-row" data-code="{{ market.code }}" data-city="{{ market.city }}" data-name="{{ market.name }}">
-              <input type="checkbox" name="markets" value="{{ market.name }}" class="market-input">
+            <label class="market-row" data-code="{{ market.code }}" data-city="{{ market.city }}" data-name="{{ market.name }}" data-testid="search-market-option-{{ market.test_id_segment }}">
+              <input type="checkbox" name="markets" value="{{ market.name }}" class="market-input" data-testid="search-market-checkbox-{{ market.test_id_segment }}">
               <span class="custom-checkbox">
                 <i data-lucide="check"></i>
               </span>
@@ -50,91 +50,61 @@
         
         <!-- Right: SVG Map -->
         <div class="market-map-container">
-          <div class="map-tooltip" id="map-tooltip"></div>
-          <div class="map-loading" id="map-loading">
+          <div class="map-tooltip" id="map-tooltip" data-testid="search-map-tooltip"></div>
+          <div class="map-loading" id="map-loading" data-testid="search-map-loading">
             <i data-lucide="loader-2" class="spin-icon"></i> <span>Chargement de la carte...</span>
           </div>
           
           <!-- Controls Panel -->
           <div class="map-controls">
-            <button type="button" class="map-control-btn" id="map-zoom-in" title="Zoomer"><i data-lucide="plus"></i></button>
-            <button type="button" class="map-control-btn" id="map-zoom-out" title="Dézoomer"><i data-lucide="minus"></i></button>
-            <button type="button" class="map-control-btn" id="map-zoom-reset" title="Recentrer"><i data-lucide="rotate-ccw"></i></button>
+            <button type="button" class="map-control-btn" id="map-zoom-in" title="Zoomer" data-testid="search-map-zoom-in-button"><i data-lucide="plus"></i></button>
+            <button type="button" class="map-control-btn" id="map-zoom-out" title="Dézoomer" data-testid="search-map-zoom-out-button"><i data-lucide="minus"></i></button>
+            <button type="button" class="map-control-btn" id="map-zoom-reset" title="Recentrer" data-testid="search-map-reset-button"><i data-lucide="rotate-ccw"></i></button>
           </div>
           
-          <div id="europe-map-svg" class="europe-map-svg-wrapper"></div>
+          <div id="europe-map-svg" class="europe-map-svg-wrapper" data-testid="search-map"></div>
         </div>
       </div>
     </div>
 
-    <!-- Panel 2: Période & Options -->
-    <div class="form-grid-two-columns">
-      <div class="form-card">
-        <div class="card-header">
-          <i data-lucide="calendar" class="header-icon"></i>
-          <div>
-            <h2>Période de publication</h2>
-            <p class="card-desc">Définissez l'intervalle de dates pour la recherche.</p>
-          </div>
-        </div>
-
-        <div class="date-presets">
-          <button type="button" class="btn-preset" data-preset="7">7J</button>
-          <button type="button" class="btn-preset" data-preset="30">30J</button>
-          <button type="button" class="btn-preset" data-preset="90">90J</button>
-          <button type="button" class="btn-preset" data-preset="365">1 An</button>
-          <button type="button" class="btn-preset active" data-preset="custom">Perso</button>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="date_from">Date début</label>
-            <div class="input-with-icon">
-              <i data-lucide="calendar-days" class="input-icon"></i>
-              <input type="date" id="date_from" name="date_from" required>
-            </div>
-          </div>
-          <div class="field">
-            <label for="date_to">Date fin</label>
-            <div class="input-with-icon">
-              <i data-lucide="calendar-days" class="input-icon"></i>
-              <input type="date" id="date_to" name="date_to" required>
-            </div>
-          </div>
+    <!-- Panel 2: Période -->
+    <div class="form-card" data-testid="search-date-section">
+      <div class="card-header">
+        <i data-lucide="calendar" class="header-icon"></i>
+        <div>
+          <h2>Période de publication</h2>
+          <p class="card-desc">Définissez l'intervalle de dates pour la recherche.</p>
         </div>
       </div>
 
-      <div class="form-card">
-        <div class="card-header">
-          <i data-lucide="sliders" class="header-icon"></i>
-          <div>
-            <h2>Filtres & Optimisation</h2>
-            <p class="card-desc">Précisez vos critères ou optimisez le traitement.</p>
+      <div class="date-presets" data-testid="search-date-presets">
+        <button type="button" class="btn-preset" data-preset="7" data-testid="search-date-preset-7-button">7J</button>
+        <button type="button" class="btn-preset" data-preset="30" data-testid="search-date-preset-30-button">30J</button>
+        <button type="button" class="btn-preset" data-preset="90" data-testid="search-date-preset-90-button">90J</button>
+        <button type="button" class="btn-preset" data-preset="365" data-testid="search-date-preset-365-button">1 An</button>
+        <button type="button" class="btn-preset active" data-preset="custom" data-testid="search-date-preset-custom-button">Perso</button>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="date_from">Date début</label>
+          <div class="input-with-icon">
+            <i data-lucide="calendar-days" class="input-icon"></i>
+            <input type="date" id="date_from" name="date_from" required data-testid="search-date-from-input">
           </div>
         </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="query">Texte libre</label>
-            <div class="input-with-icon">
-              <i data-lucide="search" class="input-icon"></i>
-              <input type="text" id="query" name="query" placeholder="Émetteur, titre, mots clés…">
-            </div>
-          </div>
-          <div class="field">
-            <label for="issuer_isin">Code ISIN</label>
-            <div class="input-with-icon">
-              <i data-lucide="hash" class="input-icon"></i>
-              <input type="text" id="issuer_isin" name="issuer_isin" placeholder="FR0000123456" maxlength="12">
-            </div>
+        <div class="field">
+          <label for="date_to">Date fin</label>
+          <div class="input-with-icon">
+            <i data-lucide="calendar-days" class="input-icon"></i>
+            <input type="date" id="date_to" name="date_to" required data-testid="search-date-to-input">
           </div>
         </div>
-
       </div>
     </div>
 
     <!-- Panel 3: Types de documents -->
-    <div class="form-card">
+    <div class="form-card" data-testid="search-document-type-section">
       <div class="card-header">
         <i data-lucide="file-text" class="header-icon"></i>
         <div>
@@ -145,8 +115,8 @@
       
       <div class="doc-types-grid">
         {% for value, label in document_types %}
-        <label class="doc-checkbox-chip">
-          <input type="checkbox" name="document_types" value="{{ value }}">
+        <label class="doc-checkbox-chip" data-testid="search-document-type-option-{{ value|replace('_', '-') }}">
+          <input type="checkbox" name="document_types" value="{{ value }}" data-testid="search-document-type-checkbox-{{ value|replace('_', '-') }}">
           <span class="chip-content">
             <i data-lucide="file" class="chip-icon"></i>
             <span class="chip-label">{{ label }}</span>
@@ -158,7 +128,7 @@
 
     <!-- Actions -->
     <div class="form-actions">
-      <button type="submit" class="btn-primary btn-large btn-glow">
+      <button type="submit" class="btn-primary btn-large btn-glow" data-testid="search-submit-button">
         <i data-lucide="play-circle"></i>
         <span>Lancer la recherche en temps réel</span>
       </button>

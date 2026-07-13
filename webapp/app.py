@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 import tempfile
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -34,6 +36,16 @@ DOCUMENT_TYPES = (
 
 _WEBAPP_DIR = Path(__file__).resolve().parent
 _TEMPLATES = Jinja2Templates(directory=str(_WEBAPP_DIR / "templates"))
+
+
+def _test_id_segment(value: str) -> str:
+    transliterated = value.casefold().translate(
+        str.maketrans({"ø": "o", "æ": "ae", "œ": "oe", "ł": "l"})
+    )
+    ascii_value = unicodedata.normalize("NFKD", transliterated).encode(
+        "ascii", "ignore"
+    ).decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
 
 
 def _request_from_schema(payload: SearchCreateRequest) -> LinkSearchRequest:
@@ -273,7 +285,8 @@ def create_app(
                 "name": name,
                 "city": meta["city"],
                 "country": meta["country"],
-                "code": meta["code"]
+                "code": meta["code"],
+                "test_id_segment": _test_id_segment(name),
             })
             
         # Sort by city (alphabetical), then by market name

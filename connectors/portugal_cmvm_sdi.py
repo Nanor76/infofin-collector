@@ -14,7 +14,7 @@ from urllib.parse import urldefrag, urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from classification import supported_extension
+from classification import classify_document, supported_extension
 from connectors.base import Connector, ConnectorError, ConnectorState, DocumentCandidate
 from connectors.base import EndpointAttempt
 from models import Issuer
@@ -312,6 +312,9 @@ def parse_api_notice(
         if period == "semiannual"
         else "annual_financial_report"
     )
+    title_class = classify_document(title, "")
+    if title_class == "universal_registration_document":
+        document_type = title_class
     return PortugalNotice(
         record_id=record_id,
         published_date=_parse_date(item.get("DATA_FACT")),

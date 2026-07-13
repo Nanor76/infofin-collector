@@ -256,6 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
     svgElement.style.height = '100%';
     svgElement.style.maxHeight = '100%';
     svgElement.style.maxWidth = '100%';
+    svgElement.setAttribute('data-testid', 'search-map-canvas');
 
     // Wrap all children of the SVG in a viewport group for panning/zooming
     let viewport = svgElement.querySelector('#map-viewport');
@@ -370,6 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const isInteractive = interactiveCountryCodes.includes(code);
       if (isInteractive) {
         path.classList.add('country-interactive');
+        path.setAttribute('data-testid', `search-map-country-${code.toLowerCase()}`);
         
         // Initial state sync
         updatePathSelectionState(path, code);

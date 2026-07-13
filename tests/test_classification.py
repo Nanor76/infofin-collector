@@ -17,6 +17,26 @@ from classification import classify_document, supported_extension
         ("Informe financiero anual (ACCIONA, S.A.)", "https://example.test/a.pdf", "annual_financial_report"),
         ("Informe semestral 2025", "https://example.test/h.pdf", "half_year_financial_report"),
         ("NPRO: 2Q 2026 - Strong letting quarter", "https://example.test/q2.pdf", "quarterly_financial_report"),
+        (
+            "Relatório e Contas do Primeiro Semestre de 2025",
+            "https://example.test/h.pdf",
+            "half_year_financial_report",
+        ),
+        (
+            "Delårsrapport for 2. kvartal 2025/26 - halvår",
+            "https://example.test/dk.pdf",
+            "half_year_financial_report",
+        ),
+        (
+            "Servatur Holding Q4 2025/26 Interim Report",
+            "https://example.test/q4.pdf",
+            "quarterly_financial_report",
+        ),
+        (
+            "Årsmelding for Øygarden kommune 2025",
+            "https://example.test/no.pdf",
+            "annual_financial_report",
+        ),
     ],
 )
 def test_classification_rules(title: str, url: str, expected: str | None) -> None:

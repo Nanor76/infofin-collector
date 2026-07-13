@@ -93,6 +93,9 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
     if (
         "quarterly report" in normalized_title
         or "quarterly period" in normalized_title
+        or "tertialrapport" in normalized_title
+        or re.search(r"\btertial\b", normalized_title)
+        or re.search(r"\bt[1-4]\b", normalized_title)
         or re.search(r"\bq[1-4]\b", normalized_title)
         or re.search(r"\b[1-4]q\b", normalized_title)
         or re.search(
@@ -115,6 +118,7 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
         or "arsrapport" in normalized_title
         or "arsberetning" in normalized_title
         or "arsregnskap" in normalized_title
+        or "arsmelding" in normalized_title
         or normalized_topic
         == normalize_text(OSLO_SOURCE_TOPICS[0])
     ):

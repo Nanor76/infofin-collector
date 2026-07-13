@@ -56,8 +56,25 @@ def classify_document(
         return "universal_registration_document"
 
     if (
+        "quarterly report" in text
+        or "quarterly period" in text
+        or "tertialrapport" in text
+        or re.search(r"\btertial\b", text)
+        or re.search(r"\bt[1-4]\b", text)
+        or "informe trimestral" in text
+        or re.search(r"\bq[1-4]\b", text)
+        or re.search(r"\b[1-4]q\b", text)
+        or re.search(
+            r"\b(?:first|second|third|fourth) quarter\b",
+            text,
+        )
+    ):
+        return "quarterly_financial_report"
+
+    if (
         "rapport financier semestriel" in text
         or "half-year financial report" in text
+        or "half-yearly financial report" in text
         or "half year financial report" in text
         or "half yearly financial report" in text
         or "semi-annual financial report" in text
@@ -70,6 +87,10 @@ def classify_document(
         or "publicacao de contas semestrais" in text
         or "relatorio e contas do 1 semestre" in text
         or "relatorio e contas do 1 o semestre" in text
+        or "relatorio e contas do primeiro semestre" in text
+        or "primeiro semestre" in text
+        or "delarsrapport" in text
+        or "halvaar" in text
         or "informe financiero semestral" in text
         or "informe semestral" in text
         or "cuentas semestrales" in text
@@ -89,6 +110,9 @@ def classify_document(
         or "annual report" in text
         or "jaarverslag" in text
         or "arsrapport" in text
+        or "arsmelding" in text
+        or "arsberetning" in text
+        or "arsregnskap" in text
         or "relatorio financeiro anual" in text
         or "relatorio e contas anual" in text
         or "relatorio e contas" in text
@@ -100,18 +124,6 @@ def classify_document(
         or re.search(r"\brfa\b", text)
     ):
         return "annual_financial_report"
-
-    if (
-        "quarterly report" in text
-        or "informe trimestral" in text
-        or re.search(r"\bq[1-4]\b", text)
-        or re.search(r"\b[1-4]q\b", text)
-        or re.search(
-            r"\b(?:first|second|third|fourth) quarter\b",
-            text,
-        )
-    ):
-        return "quarterly_financial_report"
 
     if "financial report" in text:
         return "financial_report"

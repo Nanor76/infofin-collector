@@ -1482,13 +1482,15 @@ input::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #fff;
+  color: #fff !important;
+  text-decoration: none !important;
+  cursor: default !important;
 }
 
 .title-cell:hover {
-  color: var(--accent);
-  text-decoration: underline;
-  cursor: help;
+  color: #fff !important;
+  text-decoration: none !important;
+  cursor: default !important;
 }
 
 .source-cell {

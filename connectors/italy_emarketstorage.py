@@ -102,7 +102,6 @@ def classify_italy_document(
     url: str = "",
 ) -> str | None:
     title_norm = normalize_text(title)
-    suffix = PurePosixPath(urlparse(url).path).suffix.casefold()
     category_kind = _category_kind(category)
 
     if any(
@@ -137,6 +136,10 @@ def classify_italy_document(
             "corporate governance",
             "assetti proprietari",
             "relazione illustrativa",
+            "presentation",
+            "analyst presentation",
+            "investor presentation",
+            "investors presentation",
         )
     ):
         return "other_regulatory_announcement"
@@ -145,6 +148,8 @@ def classify_italy_document(
         "relazione finanziaria annuale",
         "relazioni finanziarie annuali",
         "annual financial report",
+        "annual financial statements",
+        "statutory annual",
         "annual report",
         "bilancio d esercizio",
         "bilancio di esercizio",
@@ -176,12 +181,6 @@ def classify_italy_document(
         return "half_year_financial_report"
     if any(term in title_norm for term in interim_terms):
         return "quarterly_financial_report"
-    if (
-        "esef" in title_norm
-        or "xbrl" in title_norm
-        or suffix in {".xhtml", ".xht", ".zip", ".xbri"}
-    ):
-        return "esef"
     if category_kind == "annual":
         return "annual_financial_report"
     if category_kind == "half_year":

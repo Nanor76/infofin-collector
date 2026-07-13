@@ -11,27 +11,27 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- CSS Style -->
-  <link rel="stylesheet" href="/static/app.css?v=2.2">
+  <link rel="stylesheet" href="/static/app.css?v=2.3">
   
   <!-- HTMX & Lucide Icons -->
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="/static/app.js?v=2.2" defer></script>
+  <script src="/static/app.js?v=2.4" defer></script>
 </head>
 <body>
-  <header class="site-header">
+  <header class="site-header" data-testid="layout-header">
     <div class="container header-container">
-      <a href="/" class="brand">
+      <a href="/" class="brand" data-testid="layout-home-link">
         <i data-lucide="trending-up" class="brand-icon"></i>
         <span>InfoFin</span>
       </a>
       <span class="tagline">Collecteur & Indexateur de Documents Financiers</span>
     </div>
   </header>
-  <main class="container">
+  <main class="container" data-testid="layout-main">
     {% block content %}{% endblock %}
   </main>
-  <footer class="site-footer">
+  <footer class="site-footer" data-testid="layout-footer">
     <div class="container">
       <p>&copy; 2026 InfoFin. Tous droits réservés. Interface modernisée pour une expérience premium.</p>
     </div>

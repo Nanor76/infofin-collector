@@ -111,7 +111,7 @@ class Settings:
     spain_rate_limit_seconds: float = 0.5
     spain_verify_ssl: bool = True
     spain_bme_listed_companies_url: str = "https://www.bolsasymercados.es"
-    sweden_fi_base_url: str = "https://borsinformation.fi.se"
+    sweden_fi_base_url: str = "https://finanscentralen.fi.se"
     sweden_fi_lookback_days: int = 30
     sweden_rate_limit_seconds: float = 0.5
     sweden_verify_ssl: bool = True
@@ -378,7 +378,7 @@ class Settings:
             ).rstrip("/"),
             sweden_fi_base_url=os.getenv(
                 "SWEDEN_FI_BASE_URL",
-                "https://borsinformation.fi.se",
+                "https://finanscentralen.fi.se",
             ).rstrip("/"),
             sweden_fi_lookback_days=max(
                 1,

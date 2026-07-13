@@ -132,6 +132,7 @@ def classify_afm_document(
             "halfjaarlijkse financiele verslaggeving",
             "half yearly financial report",
             "half-yearly financial report",
+            "half-yearly report",
             "half-year financial report",
             "semi annual financial report",
             "semi-annual financial report",
@@ -151,12 +152,6 @@ def classify_afm_document(
         return "annual_financial_report"
     if "financial report" in combined:
         return "financial_report"
-    if (
-        suffix in {".xhtml", ".xht", ".zip", ".xbri"}
-        or "esef" in combined
-        or "xhtml" in combined
-    ):
-        return "esef"
     return None
 
 

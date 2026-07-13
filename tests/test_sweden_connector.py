@@ -16,7 +16,7 @@ from connectors.sweden_fi import (
 from models import Issuer
 
 FIXTURES = Path(__file__).parent / "fixtures"
-BASE_URL = "https://borsinformation.fi.se"
+BASE_URL = "https://finanscentralen.fi.se"
 NASDAQ_URL = "https://www.nasdaqomxnordic.com"
 
 def fixture(name: str) -> str:
@@ -123,7 +123,7 @@ def test_connector_methods_and_nasdaq_enrichment() -> None:
     assert all(d.source == "sweden_fi" for d in docs)
     assert docs[0].document_type == "annual_financial_report"
     assert docs[0].metadata["file_format"] == "pdf"
-    assert docs[2].url == "https://borsinformation.fi.se/Search/Detail?id=rec-volvo-456"
+    assert docs[2].url == "https://finanscentralen.fi.se/Search/Detail?id=rec-volvo-456"
 
     # Test discover
     disc = connector.discover(query="Årsredovisning")

@@ -1,0 +1,181 @@
+# Catalogue et routage des tests
+
+Ce fichier donne a un contributeur ou a une instance LLM la vue la plus courte
+pour trouver les cas existants a modifier. Il ne remplace pas `TESTING.md`, qui
+decrit la strategie, les commandes et le contrat `data-testid`.
+
+## Demarrage rapide
+
+Pour toute evolution :
+
+1. partir du fichier applicatif modifie dans la table de routage ci-dessous ;
+2. ouvrir les fichiers de tests indiques et rechercher les cas par nom ;
+3. confirmer la liste reelle des cas avec les commandes d'inventaire ;
+4. modifier ou ajouter le test au niveau le plus proche du comportement ;
+5. si le comportement est visible dans le navigateur, mettre aussi a jour un
+   parcours Playwright ;
+6. mettre a jour ce catalogue si la responsabilite, le nom ou l'emplacement
+   d'un cas change.
+
+Commandes d'inventaire toujours a jour :
+
+```powershell
+# Tous les fichiers de tests
+rg --files tests | Sort-Object
+
+# Tous les cas pytest avec leur ligne
+rg -n -g "test_*.py" "^def test_" tests
+
+# Cas d'un module precis, tels que pytest les collecte
+python -m pytest tests/test_web_api.py --collect-only -q
+
+# Tous les parcours Playwright
+npm run test:e2e:list
+```
+
+## Routage par zone de code
+
+| Zone modifiee | Tests principaux | Quand ajouter Playwright |
+| --- | --- | --- |
+| `webapp/app.py`, routes et rendu Jinja | `test_web_api.py` | des que la reponse modifie une page, une navigation ou un etat visible |
+| `webapp/templates/**` | `test_web_api.py`, `e2e/essential-flows.spec.ts` | toujours pour un controle, un oracle ou un parcours modifie |
+| `webapp/static/app.js` | `test_web_api.py`, `e2e/essential-flows.spec.ts` | toujours ; couvrir l'interaction et son resultat observable |
+| `webapp/services/document_search.py` | `test_web_document_search.py` | si les resultats ou etats affiches changent |
+| `webapp/services/filters.py` | `test_web_filters.py`, `test_web_repository.py` | si un filtre UI ou son compteur change |
+| `webapp/services/exports.py` | `test_web_api.py` et tests du service concernes | pour le telechargement, le nom ou le contenu du fichier |
+| `webapp/jobs.py` | `test_web_jobs.py` | si les transitions, compteurs, alertes ou rafraichissements changent |
+| `webapp/repositories.py` | `test_web_repository.py` | si tri, filtre, pagination ou donnees visibles changent |
+| `webapp/schemas.py` | `test_web_api.py` | si le formulaire ou les erreurs de validation changent |
+| `db.py` | `test_db.py` et test repository concerne | si la modification atteint un parcours utilisateur |
+| `classification.py` | `test_classification.py` | si la classification est exposee dans la webapp |
+| `download.py`, `http_client.py` | `test_download.py`, `test_ssl_verification.py` | seulement si le comportement visible de la webapp change |
+| `main.py`, `operations.py` | `test_main.py`, `test_operations.py` | si le lancement ou une action utilisateur web change |
+| `watcher.py` | `test_watcher.py`, `test_source_first_watch.py`, tests `*_watch.py` | si les donnees collectees sont exposees dans la webapp |
+| `connectors/<pays>.py` | `test_<pays>_connector.py`, puis `test_<pays>_watch.py` | si le format ou les etats remontes a l'interface changent |
+| migration d'un connecteur | `test_<pays>_migration.py` lorsqu'il existe | si la migration affecte des resultats visibles |
+| integration officielle | tests `*_live.py` ou cas marques `live` | jamais dans la suite E2E standard sans fixture locale |
+| `screener/**` | `test_screener.py` | uniquement si une interface web l'expose |
+| fixtures HTML/JSON/XML/PDF/ZIP | test connecteur qui les consomme | mettre a jour `e2e/server.py` seulement pour un etat UI necessaire |
+
+## Catalogue detaille de la webapp
+
+### API, pages et contrat UI — `tests/test_web_api.py`
+
+| Groupe | Cas existants | Modifier lorsque |
+| --- | --- | --- |
+| Referentiels | `test_get_markets`, `test_get_document_types`, `test_get_health` | une liste, une valeur ou la sante change |
+| Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_get_unknown_search_returns_404` | payload, identifiant, statut ou erreur change |
+| Resultats API | `test_get_search_results_paginates` | pagination ou structure JSON change |
+| Page de recherche | `test_get_home_contains_form`, `test_home_interactive_elements_have_test_ids` | formulaire, controle ou `data-testid` change |
+| Page de resultats | `test_get_results_page_with_fake_job`, `test_results_interactive_elements_have_test_ids` | tableau, action, filtre ou export change |
+| Etats conditionnels | `test_results_conditional_states_have_test_ids` | vide, chargement, warning, erreur ou execution par marche change |
+| Carte dynamique | `test_dynamic_map_interactions_define_test_ids` | SVG, pays cliquables ou generation JS des identifiants change |
+| Polling | `test_terminal_results_page_does_not_auto_poll_results`, `test_running_results_page_polls_with_current_filters` | terminalite, frequence ou filtres HTMX changent |
+| Pagination HTMX | `test_results_pagination_uses_htmx_values_and_form_filters` | navigation, `hx-vals`, `hx-include` ou conservation des filtres change |
+
+La fixture `FakeJobManager` de ce fichier contient actuellement quatre etats de
+reference : termine avec un resultat, en cours, partiel avec alertes et termine
+avec 51 resultats pagines. Ajouter un etat ici lorsqu'un rendu serveur doit etre
+teste sans navigateur.
+
+### Recherche de documents — `tests/test_web_document_search.py`
+
+| Cas | Responsabilite |
+| --- | --- |
+| `test_search_links_filters_dates_and_dedupes` | filtrage des dates et deduplication |
+| `test_search_links_connector_error_does_not_block_other_markets` | isolation d'une erreur entre marches |
+| `test_search_links_dedupe_url_aggregates_markets` | aggregation des marches par URL |
+| `test_search_links_closes_session_on_connector_exception` | fermeture de session apres exception |
+| `test_search_links_rejects_invalid_date_range` | rejet d'un intervalle invalide |
+| `test_search_links_parallel_and_callback` | parallelisme et callback de progression |
+
+### Filtres — `tests/test_web_filters.py`
+
+| Cas | Responsabilite |
+| --- | --- |
+| `test_filter_by_annual_document_type` | type de document annuel |
+| `test_filter_by_accent_insensitive_query` | recherche insensible aux accents |
+| `test_normalize_search_text_strips_accents` | normalisation du texte |
+| `test_filter_by_isin_in_comma_joined_list` | ISIN dans une liste agregee |
+| `test_filter_by_source` | source |
+| `test_filter_by_format` | format |
+| `test_filter_by_date_confidence` | confiance de date |
+| `test_filter_composes_multiple_filters` | composition de plusieurs filtres |
+
+### Jobs — `tests/test_web_jobs.py`
+
+| Cas | Responsabilite |
+| --- | --- |
+| `test_submit_creates_done_job` | job termine avec succes |
+| `test_submit_partial_when_errors_and_results` | statut partiel avec erreurs et resultats |
+| `test_submit_failed_when_errors_without_results` | statut echoue sans resultat |
+| `test_cancel_on_finished_job_does_not_break` | annulation non destructive d'un job termine |
+
+### Repository — `tests/test_web_repository.py`
+
+| Cas | Responsabilite |
+| --- | --- |
+| `test_initialize_web_search_schema` | initialisation du schema |
+| `test_create_and_get_job` | creation et lecture d'un job |
+| `test_replace_results_and_list_paginated` | remplacement et pagination |
+| `test_replace_results_overwrites_previous_rows` | ecrasement des anciennes lignes |
+| `test_list_results_filters` | filtres repository |
+| `test_list_results_sort_whitelist` | liste blanche de tri |
+| `test_upsert_market_run_and_purge` | executions par marche et purge |
+
+## Catalogue Playwright
+
+Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
+
+| Cas | Responsabilites protegees | Fixtures principales |
+| --- | --- | --- |
+| `la recherche permet de sélectionner les critères et affiche les résultats` | carte chargee, criteres, payload POST, navigation, statut et premiere page | 51 rapports annuels |
+| `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
+| `les filtres HTMX couvrent le type, le texte et l'état vide` | filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
+| `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |
+
+Fichiers de support :
+
+- `tests/e2e/server.py` : application FastAPI isolee, SQLite temporaire,
+  `DeterministicJobManager` et documents metier ;
+- `tests/e2e/fixtures.ts` : HTMX local, neutralisation des CDN et detection des
+  erreurs JavaScript non gerees ;
+- `playwright.config.ts` : Chromium, serveur, traces, captures, videos et
+  politique CI.
+
+Lorsqu'un nouveau parcours visible est ajoute, completer le tableau ci-dessus
+et le tableau de couverture essentielle de `TESTING.md` dans la meme
+modification.
+
+## Garde-fou de synchronisation du catalogue
+
+`tests/test_test_catalog.py` compare automatiquement ce document avec les cas
+reellement declares :
+
+- `test_catalog_lists_every_web_pytest_case` exige que chaque fonction
+  `test_*` des fichiers `tests/test_web*.py` apparaisse ici ;
+- `test_catalog_lists_every_playwright_case` exige que chaque titre Playwright
+  de `tests/e2e/*.spec.ts` apparaisse ici.
+
+Ce garde-fou fait echouer pytest lorsqu'un cas web ou Playwright est ajoute ou
+renomme sans mise a jour du catalogue.
+
+## Autres familles de tests
+
+Le nommage permet de router rapidement les changements hors webapp :
+
+- `test_<pays>_connector.py` : parsing et comportement du connecteur avec les
+  fixtures de `tests/fixtures/` ;
+- `test_<pays>_watch.py` : integration du connecteur dans la collecte ;
+- `test_<pays>_migration.py` : compatibilite ou migration des donnees ;
+- `test_<pays>_live.py` et cas marques `live` : verification reseau opt-in ;
+- `test_db.py`, `test_download.py`, `test_classification.py`,
+  `test_load_watchlist.py`, `test_issuer_list_sync.py` : briques centrales ;
+- `test_market_document_links.py`, `test_operations.py`, `test_main.py` :
+  orchestration et interfaces de commande ;
+- `test_ssl_verification.py` : politiques SSL des integrations ;
+- `test_screener.py` : sous-systeme screener.
+
+Pour un connecteur, verifier les quatre familles `connector`, `watch`,
+`migration` et `live` avec `rg --files tests | rg "<pays>"` avant de choisir les
+cas a modifier.
