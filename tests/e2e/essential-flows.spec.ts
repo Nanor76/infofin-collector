@@ -100,6 +100,8 @@ test("les filtres HTMX couvrent le type, le texte et l'état vide", async ({
   const search = await createFixtureSearch(page);
   await page.goto(`/searches/${search.job_id}`);
 
+  await expect(page.getByTestId("results-filter-isin-input")).toHaveCount(0);
+
   await page
     .getByTestId("results-filter-document-type-select")
     .selectOption("half_year_financial_report");

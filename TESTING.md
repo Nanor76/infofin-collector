@@ -95,7 +95,7 @@ La couverture essentielle est repartie ainsi :
 | --- | --- |
 | Recherche | chargement de la carte, selection d'un marche, dates, type de document, payload API, navigation et resultats |
 | Selection | boutons Tous/Aucun, synchronisation carte-liste et validation sans marche |
-| Filtres | mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
+| Filtres | absence du filtre ISIN redondant, mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
 | Resultats | tri, pagination aller-retour et telechargement CSV |
 | Confidentialite | champs techniques de collecte absents des pages, de l'API et des exports ; ouverture directe de l'adresse officielle du document |
 

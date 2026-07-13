@@ -404,6 +404,8 @@ def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
         assert not _interactive_elements_without_test_id(soup)
 
     page_soup = BeautifulSoup(responses[0].text, "html.parser")
+    assert page_soup.select_one('[name="issuer_isin"]') is None
+    assert "Société (ISIN)" not in page_soup.get_text(" ", strip=True)
     _assert_test_ids(
         page_soup,
         {
@@ -426,7 +428,6 @@ def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
             "results-filter-document-type-select",
             "results-filter-market-input",
             "results-filter-query-input",
-            "results-filter-isin-input",
             "results-table-region",
             "results-summary",
             "results-total-count",

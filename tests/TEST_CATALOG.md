@@ -133,7 +133,7 @@ Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
 | --- | --- | --- |
 | `la recherche permet de sélectionner les critères et affiche les résultats` | carte chargee, criteres, payload POST, navigation, statut et premiere page | 51 rapports annuels |
 | `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
-| `les filtres HTMX couvrent le type, le texte et l'état vide` | filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
+| `les filtres HTMX couvrent le type, le texte et l'état vide` | absence du filtre ISIN redondant, filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
 | `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |
 | `les métadonnées techniques restent masquées et les documents s'ouvrent à leur adresse officielle` | absence de source et identifiant techniques ; lien officiel direct, ouverture HTTP 200 et absence du bouton de copie | provenance interne sentinelle et URL officielle interceptee des 51 documents |
 
