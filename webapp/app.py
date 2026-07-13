@@ -48,7 +48,11 @@ def _test_id_segment(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
 
 
-def _request_from_schema(payload: SearchCreateRequest) -> LinkSearchRequest:
+def _request_from_schema(
+    payload: SearchCreateRequest,
+    *,
+    max_candidates: int,
+) -> LinkSearchRequest:
     return LinkSearchRequest(
         markets=tuple(payload.markets),
         date_from=payload.date_from,
@@ -56,12 +60,68 @@ def _request_from_schema(payload: SearchCreateRequest) -> LinkSearchRequest:
         document_types=tuple(payload.document_types),
         query=payload.query,
         issuer_isin=payload.issuer_isin,
-        sources=tuple(payload.sources),
-        formats=tuple(payload.formats),
-        date_confidences=tuple(payload.date_confidences),
-        max_candidates=payload.max_candidates,
+        sources=(),
+        formats=(),
+        date_confidences=(),
+        max_candidates=max_candidates,
         dedupe_url=True,
     )
+
+
+def _public_search_status(status: dict[str, object]) -> dict[str, object]:
+    raw_warnings = list(status.get("warnings") or [])
+    raw_errors = list(status.get("errors") or [])
+    public_markets = []
+    for run in list(status.get("markets") or []):
+        public_markets.append(
+            {
+                "market": str(run.get("market") or ""),
+                "status": str(run.get("status") or ""),
+                "results_count": int(run.get("results_count") or 0),
+                "warning": (
+                    "Les résultats peuvent être incomplets pour ce marché."
+                    if run.get("warning")
+                    else None
+                ),
+                "error": (
+                    "La recherche n'a pas abouti pour ce marché."
+                    if run.get("error")
+                    else None
+                ),
+            }
+        )
+    return {
+        "job_id": str(status.get("job_id") or ""),
+        "status": str(status.get("status") or ""),
+        "results_count": int(status.get("results_count") or 0),
+        "warnings": (
+            ["Certains résultats peuvent être incomplets."]
+            if raw_warnings
+            else []
+        ),
+        "errors": (
+            ["Une partie de la recherche n'a pas abouti."]
+            if raw_errors
+            else []
+        ),
+        "markets": public_markets,
+    }
+
+
+def _public_result(row: dict[str, object]) -> dict[str, object]:
+    return {
+        "market": row.get("market") or "",
+        "published_at": row.get("published_at"),
+        "period_end_date": row.get("period_end_date"),
+        "reporting_year": row.get("reporting_year"),
+        "document_type": row.get("document_type") or "",
+        "title": row.get("title") or "",
+        "issuer_name": row.get("issuer_name"),
+        "issuer_isin": row.get("issuer_isin"),
+        "issuer_lei": row.get("issuer_lei"),
+        "file_format": row.get("file_format"),
+        "document_url": row.get("url") or "",
+    }
 
 
 def create_app(
@@ -81,7 +141,12 @@ def create_app(
         max_workers=resolved_settings.web_workers,
     )
 
-    app = FastAPI(title="InfoFin Document Search")
+    app = FastAPI(
+        title="InfoFin Document Search",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
     app.mount(
         "/static",
         StaticFiles(directory=str(_WEBAPP_DIR / "static")),
@@ -116,7 +181,12 @@ def create_app(
                 status_code=422,
                 detail="date_from doit être inférieur ou égal à date_to",
             )
-        job_id = resolved_job_manager.submit(_request_from_schema(payload))
+        job_id = resolved_job_manager.submit(
+            _request_from_schema(
+                payload,
+                max_candidates=resolved_settings.web_max_candidates,
+            )
+        )
         return SearchCreateResponse(
             job_id=job_id,
             status_url=f"/api/searches/{job_id}",
@@ -128,14 +198,13 @@ def create_app(
         status = resolved_job_manager.get_status(job_id)
         if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
-        return SearchStatusResponse(**status)
+        return SearchStatusResponse(**_public_search_status(status))
 
     @app.get("/api/searches/{job_id}/results", response_model=SearchResultsResponse)
     def get_search_results(
         job_id: str,
         document_type: str | None = None,
         market: str | None = None,
-        source: str | None = None,
         q: str | None = None,
         issuer_isin: str | None = None,
         sort: str = "-published_at",
@@ -148,7 +217,6 @@ def create_app(
             job_id,
             document_type=document_type,
             market=market,
-            source=source,
             q=q,
             issuer_isin=issuer_isin,
             sort=sort,
@@ -160,7 +228,7 @@ def create_app(
             total=total,
             page=page,
             page_size=page_size,
-            results=results,
+            results=[_public_result(row) for row in results],
         )
 
     @app.get("/api/searches/{job_id}/export")
@@ -169,7 +237,6 @@ def create_app(
         format: str = Query(default="csv", pattern="^(csv|json)$"),
         document_type: str | None = None,
         market: str | None = None,
-        source: str | None = None,
         q: str | None = None,
         issuer_isin: str | None = None,
     ) -> FileResponse:
@@ -182,7 +249,6 @@ def create_app(
                 job_id,
                 document_type=document_type,
                 market=market,
-                source=source,
                 q=q,
                 issuer_isin=issuer_isin,
                 page=page,
@@ -192,32 +258,7 @@ def create_app(
             if len(results) >= total or not batch:
                 break
             page += 1
-        rows = [
-            {
-                "market": row.get("market", ""),
-                "source": row.get("source", ""),
-                "source_document_id": row.get("source_document_id", ""),
-                "published_at": row.get("published_at", ""),
-                "period_end_date": row.get("period_end_date", ""),
-                "reporting_year": row.get("reporting_year", ""),
-                "document_type": row.get("document_type", ""),
-                "classification": row.get("classification", ""),
-                "title": row.get("title", ""),
-                "url": row.get("url", ""),
-                "issuer_name": row.get("issuer_name", ""),
-                "issuer_isin": row.get("issuer_isin", ""),
-                "issuer_lei": row.get("issuer_lei", ""),
-                "category": row.get("category", ""),
-                "date_confidence": row.get("date_confidence", ""),
-                "source_publication_date_raw": row.get(
-                    "source_publication_date_raw", ""
-                ),
-                "file_format": row.get("file_format", ""),
-                "job_id": job_id,
-                "created_at": row.get("created_at", ""),
-            }
-            for row in results
-        ]
+        rows = [_public_result(row) for row in results]
         suffix = ".csv" if format == "csv" else ".json"
         with tempfile.NamedTemporaryFile(
             suffix=suffix,
@@ -308,7 +349,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Job inconnu")
         context: dict[str, object] = {
             "job_id": job_id,
-            "status": status,
+            "status": _public_search_status(status),
             "document_types": DOCUMENT_TYPES,
             "show_initial_results": False,
         }
@@ -318,7 +359,9 @@ def create_app(
             context.update(
                 {
                     "show_initial_results": True,
-                    "results": results,
+                    "results": [
+                        _public_result(row) for row in results
+                    ],
                     "total": total,
                     "page": 1,
                     "page_size": page_size,
@@ -326,7 +369,6 @@ def create_app(
                     "filters": {
                         "document_type": "",
                         "market": "",
-                        "source": "",
                         "q": "",
                         "issuer_isin": "",
                         "sort": "-published_at",
@@ -343,7 +385,7 @@ def create_app(
         return _TEMPLATES.TemplateResponse(
             request,
             "partials/job_status.html",
-            {"status": status},
+            {"status": _public_search_status(status)},
         )
 
     @app.get("/partials/searches/{job_id}/results", response_class=HTMLResponse)
@@ -352,7 +394,6 @@ def create_app(
         job_id: str,
         document_type: str | None = None,
         market: str | None = None,
-        source: str | None = None,
         q: str | None = None,
         issuer_isin: str | None = None,
         sort: str = "-published_at",
@@ -365,7 +406,6 @@ def create_app(
             job_id,
             document_type=document_type,
             market=market,
-            source=source,
             q=q,
             issuer_isin=issuer_isin,
             sort=sort,
@@ -378,7 +418,7 @@ def create_app(
             "partials/results_table.html",
             {
                 "job_id": job_id,
-                "results": results,
+                "results": [_public_result(row) for row in results],
                 "total": total,
                 "page": page,
                 "page_size": page_size,
@@ -386,7 +426,6 @@ def create_app(
                 "filters": {
                     "document_type": document_type or "",
                     "market": market or "",
-                    "source": source or "",
                     "q": q or "",
                     "issuer_isin": issuer_isin or "",
                     "sort": sort,

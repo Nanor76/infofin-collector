@@ -92,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
         document_types: formData.getAll("document_types"),
         query: formData.get("query") || null,
         issuer_isin: formData.get("issuer_isin") || null,
-        dedupe_url: true,
       };
 
       // Add loading state to button
@@ -134,46 +133,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Clipboard copy click handling
-  document.body.addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    
-    // Use closest to match button even when clicking SVG icon/span inside
-    const copyButton = target.closest(".copy-link");
-    if (!copyButton) {
-      return;
-    }
-
-    const url = copyButton.dataset.url;
-    if (!url || !navigator.clipboard) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      
-      // Visual feedback
-      const originalHTML = copyButton.innerHTML;
-      copyButton.innerHTML = `<i data-lucide="check"></i>`;
-      copyButton.classList.add("copied");
-      if (window.lucide) {
-        window.lucide.createIcons();
-      }
-
-      setTimeout(() => {
-        copyButton.innerHTML = originalHTML;
-        copyButton.classList.remove("copied");
-        if (window.lucide) {
-          window.lucide.createIcons();
-        }
-      }, 2000);
-    } catch (err) {
-      console.error("Clipboard copy failed:", err);
-    }
-  });
   // --- Market Selection Map & List Interaction ---
   const searchInput = document.getElementById('market-search');
   if (searchInput) {

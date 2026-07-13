@@ -30,9 +30,6 @@ def document_matches_query(document: LinkSearchDocument, query: str | None) -> b
                 document.issuer_name,
                 document.issuer_isin,
                 document.issuer_lei,
-                document.category,
-                document.source,
-                document.source_document_id,
             )
         )
     )

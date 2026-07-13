@@ -64,14 +64,15 @@ npm run test:e2e:list
 | Groupe | Cas existants | Modifier lorsque |
 | --- | --- | --- |
 | Referentiels | `test_get_markets`, `test_get_document_types`, `test_get_health` | une liste, une valeur ou la sante change |
-| Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_get_unknown_search_returns_404` | payload, identifiant, statut ou erreur change |
-| Resultats API | `test_get_search_results_paginates` | pagination ou structure JSON change |
+| Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_get_unknown_search_returns_404`, `test_private_search_controls_are_not_exposed` | payload public, identifiant, statut, erreur ou surface de documentation change |
+| Resultats API | `test_get_search_results_paginates` | pagination, structure JSON ou adresse officielle du document change |
 | Page de recherche | `test_get_home_contains_form`, `test_home_interactive_elements_have_test_ids` | formulaire, controle ou `data-testid` change |
 | Page de resultats | `test_get_results_page_with_fake_job`, `test_results_interactive_elements_have_test_ids` | tableau, action, filtre ou export change |
 | Etats conditionnels | `test_results_conditional_states_have_test_ids` | vide, chargement, warning, erreur ou execution par marche change |
 | Carte dynamique | `test_dynamic_map_interactions_define_test_ids` | SVG, pays cliquables ou generation JS des identifiants change |
 | Polling | `test_terminal_results_page_does_not_auto_poll_results`, `test_running_results_page_polls_with_current_filters` | terminalite, frequence ou filtres HTMX changent |
 | Pagination HTMX | `test_results_pagination_uses_htmx_values_and_form_filters` | navigation, `hx-vals`, `hx-include` ou conservation des filtres change |
+| Non-divulgation | `test_exports_hide_technical_provenance_but_keep_document_links` | page, statut, API ou export risque d'exposer des champs techniques autres que l'adresse officielle assumee |
 
 La fixture `FakeJobManager` de ce fichier contient actuellement quatre etats de
 reference : termine avec un resultat, en cours, partiel avec alertes et termine
@@ -98,6 +99,7 @@ teste sans navigateur.
 | `test_normalize_search_text_strips_accents` | normalisation du texte |
 | `test_filter_by_isin_in_comma_joined_list` | ISIN dans une liste agregee |
 | `test_filter_by_source` | source |
+| `test_text_query_does_not_match_private_provenance` | absence de recherche textuelle dans les champs de provenance internes |
 | `test_filter_by_format` | format |
 | `test_filter_by_date_confidence` | confiance de date |
 | `test_filter_composes_multiple_filters` | composition de plusieurs filtres |
@@ -133,6 +135,7 @@ Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
 | `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
 | `les filtres HTMX couvrent le type, le texte et l'état vide` | filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
 | `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |
+| `les métadonnées techniques restent masquées et les documents s'ouvrent à leur adresse officielle` | absence de source et identifiant techniques ; lien officiel direct, ouverture HTTP 200 et absence du bouton de copie | provenance interne sentinelle et URL officielle interceptee des 51 documents |
 
 Fichiers de support :
 

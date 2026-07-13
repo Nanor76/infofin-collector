@@ -31,7 +31,19 @@ CSV_FIELDNAMES = (
     "source_publication_date_raw",
 )
 
-WEB_CSV_FIELDNAMES = CSV_FIELDNAMES + ("file_format", "job_id", "created_at")
+WEB_CSV_FIELDNAMES = (
+    "market",
+    "published_at",
+    "period_end_date",
+    "reporting_year",
+    "document_type",
+    "title",
+    "issuer_name",
+    "issuer_isin",
+    "issuer_lei",
+    "file_format",
+    "document_url",
+)
 
 
 def _market_output_slug(value: str) -> str:

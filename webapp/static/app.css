@@ -1665,12 +1665,6 @@ input::placeholder {
   color: var(--accent) !important;
 }
 
-.copy-link.copied {
-  background: rgba(16, 185, 129, 0.12) !important;
-  border-color: var(--success) !important;
-  color: var(--success) !important;
-}
-
 /* Empty Table row state */
 .empty-row {
   padding: 0 !important;

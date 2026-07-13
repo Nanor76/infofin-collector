@@ -232,6 +232,16 @@ def test_get_search_status(client: TestClient) -> None:
     payload = response.json()
     assert payload["status"] == "done"
     assert payload["results_count"] == 1
+    assert payload["markets"] == [
+        {
+            "market": "Euronext Paris",
+            "status": "ok",
+            "results_count": 1,
+            "warning": None,
+            "error": None,
+        }
+    ]
+    assert "fake-oam" not in response.text
 
 
 def test_get_unknown_search_returns_404(client: TestClient) -> None:
@@ -251,6 +261,41 @@ def test_get_search_results_paginates(client: TestClient) -> None:
     assert payload["page"] == 1
     assert payload["page_size"] == 1
     assert len(payload["results"]) == 1
+    result = payload["results"][0]
+    assert set(result) == {
+        "market",
+        "published_at",
+        "period_end_date",
+        "reporting_year",
+        "document_type",
+        "title",
+        "issuer_name",
+        "issuer_isin",
+        "issuer_lei",
+        "file_format",
+        "document_url",
+    }
+    assert result["document_url"] == "https://official.test/report.pdf"
+    assert "fake-oam" not in response.text
+    assert "doc-1" not in response.text
+
+
+def test_private_search_controls_are_not_exposed(client: TestClient) -> None:
+    response = client.post(
+        "/api/searches",
+        json={
+            "markets": ["Euronext Paris"],
+            "date_from": "2026-06-01",
+            "date_to": "2026-06-30",
+            "sources": ["fake-oam"],
+            "max_candidates": 1,
+            "dedupe_url": False,
+        },
+    )
+
+    assert response.status_code == 422
+    assert client.get("/openapi.json").status_code == 404
+    assert client.get("/docs").status_code == 404
 
 
 def test_get_document_types(client: TestClient) -> None:
@@ -271,6 +316,7 @@ def test_get_home_contains_form(client: TestClient) -> None:
     assert response.status_code == 200
     assert 'id="search-form"' in response.text
     assert "Lancer la recherche" in response.text
+    assert "OAM" not in response.text
 
 
 def test_home_interactive_elements_have_test_ids(client: TestClient) -> None:
@@ -327,6 +373,20 @@ def test_get_results_page_with_fake_job(client: TestClient) -> None:
     partial = client.get(f"/partials/searches/{job_id}/results")
     assert partial.status_code == 200
     assert 'rel="noopener noreferrer"' in partial.text
+    partial_soup = BeautifulSoup(partial.text, "html.parser")
+    open_link = partial_soup.select_one(
+        '[data-testid="results-document-open-link"]'
+    )
+    copy_buttons = partial_soup.select(
+        '[data-testid="results-document-copy-link-button"]'
+    )
+    assert open_link is not None
+    assert str(open_link.get("href", "")) == "https://official.test/report.pdf"
+    assert copy_buttons == []
+    assert "fake-oam" not in response.text
+    assert "doc-1" not in response.text
+    assert "fake-oam" not in partial.text
+    assert "doc-1" not in partial.text
 
 
 def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
@@ -365,7 +425,6 @@ def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
             "results-filter-form",
             "results-filter-document-type-select",
             "results-filter-market-input",
-            "results-filter-source-input",
             "results-filter-query-input",
             "results-filter-isin-input",
             "results-table-region",
@@ -389,7 +448,6 @@ def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
             "results-document-title",
             "results-document-actions",
             "results-document-open-link",
-            "results-document-copy-link-button",
             "results-pagination",
             "results-pagination-previous-disabled",
             "results-pagination-summary",
@@ -403,6 +461,14 @@ def test_results_conditional_states_have_test_ids(client: TestClient) -> None:
         "/searches/alertjob1234567890abcdef12345678901"
     )
     alert_soup = BeautifulSoup(alert_response.text, "html.parser")
+    assert "fake-oam" not in alert_response.text
+    assert "Market warning" not in alert_response.text
+    assert "Market error" not in alert_response.text
+    assert "Job warning" not in alert_response.text
+    assert "Job error" not in alert_response.text
+    alert_text = alert_soup.get_text(" ", strip=True)
+    assert "Les résultats peuvent être incomplets" in alert_text
+    assert "La recherche n'a pas abouti" in alert_text
     _assert_test_ids(
         alert_soup,
         {
@@ -414,7 +480,6 @@ def test_results_conditional_states_have_test_ids(client: TestClient) -> None:
             "results-market-run",
             "results-market-run-name",
             "results-market-run-status",
-            "results-market-run-source",
             "results-market-run-count",
             "results-market-run-warning",
             "results-market-run-error",
@@ -429,6 +494,24 @@ def test_results_conditional_states_have_test_ids(client: TestClient) -> None:
     _assert_test_ids(running_soup, {"results-job-progress"})
 
 
+@pytest.mark.parametrize("output_format", ["csv", "json"])
+def test_exports_hide_technical_provenance_but_keep_document_links(
+    client: TestClient,
+    output_format: str,
+) -> None:
+    job_id = "fakejob1234567890abcdef1234567890ab"
+    response = client.get(
+        f"/api/searches/{job_id}/export",
+        params={"format": output_format},
+    )
+
+    assert response.status_code == 200
+    assert "fake-oam" not in response.text
+    assert "doc-1" not in response.text
+    assert "source_document_id" not in response.text
+    assert "https://official.test/report.pdf" in response.text
+
+
 def test_dynamic_map_interactions_define_test_ids() -> None:
     app_script = (
         Path(__file__).parents[1] / "webapp" / "static" / "app.js"
@@ -436,6 +519,8 @@ def test_dynamic_map_interactions_define_test_ids() -> None:
 
     assert "'search-map-canvas'" in app_script
     assert "`search-map-country-${code.toLowerCase()}`" in app_script
+    assert "navigator.clipboard" not in app_script
+    assert 'document.execCommand("copy")' not in app_script
 
 
 def test_terminal_results_page_does_not_auto_poll_results(

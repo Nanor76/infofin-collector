@@ -149,6 +149,51 @@ test("le tri, la pagination et l'export CSV sont opérationnels", async ({
   for await (const chunk of stream!) {
     csv += chunk.toString();
   }
-  expect(csv).toContain("market,source,source_document_id");
+  expect(csv).toContain("market,published_at,period_end_date");
+  expect(csv).not.toContain("source");
   expect(csv).toContain("Beta ASA");
+});
+
+test("les métadonnées techniques restent masquées et les documents s'ouvrent à leur adresse officielle", async ({
+  page,
+}) => {
+  const search = await createFixtureSearch(page);
+  await page.goto(`/searches/${search.job_id}`);
+
+  const pageContent = await page.content();
+  expect(pageContent).not.toContain("e2e-fixture");
+  const documentLink = page.getByTestId("results-document-open-link").first();
+  const documentHref = await documentLink.getAttribute("href");
+  expect(documentHref).toBe("https://documents.example.test/report-00.pdf");
+  await expect(documentLink).toHaveAttribute(
+    "href",
+    "https://documents.example.test/report-00.pdf",
+  );
+  await expect(page.getByTestId("results-document-copy-link-button")).toHaveCount(0);
+
+  const openedDocumentResponse = page.context().waitForEvent("response", {
+    predicate: (response) => response.url() === documentHref,
+  });
+  const popupPromise = page.waitForEvent("popup");
+  await documentLink.click();
+  const popup = await popupPromise;
+  const openedResponse = await openedDocumentResponse;
+  expect(openedResponse.status()).toBe(200);
+  await popup.close();
+
+  const apiResponse = await page.request.get(
+    `/api/searches/${search.job_id}/results?page_size=1`,
+  );
+  const apiText = await apiResponse.text();
+  expect(apiText).not.toContain("e2e-fixture");
+  expect(apiText).not.toContain("source_document_id");
+  expect(apiText).toContain("https://documents.example.test/report-00.pdf");
+
+  const exportResponse = await page.request.get(
+    `/api/searches/${search.job_id}/export?format=csv`,
+  );
+  const csv = await exportResponse.text();
+  expect(csv).not.toContain("source");
+  expect(csv).not.toContain("e2e-fixture");
+  expect(csv).toContain("https://documents.example.test/report-00.pdf");
 });

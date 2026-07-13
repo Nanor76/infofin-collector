@@ -79,6 +79,20 @@ def test_filter_by_source() -> None:
     assert filtered[0].source == "fake-oam"
 
 
+def test_text_query_does_not_match_private_provenance() -> None:
+    documents = (
+        _document(
+            source="private-collector",
+            source_document_id="secret-42",
+            category="private-taxonomy",
+        ),
+    )
+
+    assert filter_documents(documents, query="private-collector") == ()
+    assert filter_documents(documents, query="secret-42") == ()
+    assert filter_documents(documents, query="private-taxonomy") == ()
+
+
 def test_filter_by_format() -> None:
     documents = (
         _document(file_format="pdf"),

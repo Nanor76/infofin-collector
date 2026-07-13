@@ -29,6 +29,13 @@ export const test = base.extend({
       route.fulfill({ status: 200, contentType: "text/css", body: "" }),
     );
     await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
+    await page.context().route("https://documents.example.test/**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: "%PDF-1.7 e2e fixture",
+      }),
+    );
     await use(page);
     expect(pageErrors, "aucune erreur JavaScript non gérée").toEqual([]);
   },

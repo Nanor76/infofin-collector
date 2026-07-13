@@ -196,12 +196,9 @@
         <td class="title-cell" title="{{ row.get('title') or '' }}" data-testid="results-document-title">{{ row.get("title") or "" }}</td>
         <td class="actions" data-testid="results-document-actions">
           <div class="actions-group-vertical">
-            <a href="{{ row.get('url') or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-action-small open-btn" title="Ouvrir le document dans un nouvel onglet" data-testid="results-document-open-link">
+            <a href="{{ row.get('document_url') or '#' }}" target="_blank" rel="noopener noreferrer" class="btn-action-small open-btn" title="Ouvrir le document dans un nouvel onglet" data-testid="results-document-open-link">
               <i data-lucide="external-link"></i>
             </a>
-            <button type="button" class="btn-action-small copy-link" data-url="{{ row.get('url') or '' }}" title="Copier le lien du document dans le presse-papiers" data-testid="results-document-copy-link-button">
-              <i data-lucide="copy"></i>
-            </button>
           </div>
         </td>
       </tr>

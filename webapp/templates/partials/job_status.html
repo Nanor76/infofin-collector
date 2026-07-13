@@ -91,7 +91,7 @@
   <!-- Markets Run Status list -->
   {% if status.markets %}
   <div class="market-runs-section" data-testid="results-market-runs">
-    <h3>État par source et marché</h3>
+    <h3>État par marché</h3>
     <div class="market-runs-grid">
       {% for run in status.markets %}
       <div class="market-run-badge-card status-border-{{ run.status }}" data-testid="results-market-run">
@@ -109,10 +109,6 @@
           </span>
         </div>
         <div class="run-card-body">
-          <div class="run-stat-row">
-            <span class="run-stat-label">Source</span>
-            <span class="run-stat-val font-mono" data-testid="results-market-run-source">{{ run.source or "N/A" }}</span>
-          </div>
           <div class="run-stat-row">
             <span class="run-stat-label">Documents trouvés</span>
             <span class="run-stat-val font-semibold" data-testid="results-market-run-count">{{ run.results_count }}</span>

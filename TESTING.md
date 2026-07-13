@@ -97,6 +97,7 @@ La couverture essentielle est repartie ainsi :
 | Selection | boutons Tous/Aucun, synchronisation carte-liste et validation sans marche |
 | Filtres | mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
 | Resultats | tri, pagination aller-retour et telechargement CSV |
+| Confidentialite | champs techniques de collecte absents des pages, de l'API et des exports ; ouverture directe de l'adresse officielle du document |
 
 ### Installation et execution
 
@@ -255,8 +256,10 @@ await row.getByTestId("results-document-open-link").click();
 ```
 
 Le meme principe s'applique aux executions par marche : selectionner d'abord
-`results-market-run` par son contenu, puis lire `results-market-run-status`,
-`results-market-run-source` ou `results-market-run-count`.
+`results-market-run` par son contenu, puis lire `results-market-run-status` ou
+`results-market-run-count`. Les champs techniques de collecte restent internes
+et ne font pas partie du contrat UI. L'adresse officielle du document reste
+cependant visible sur l'action d'ouverture et dans les exports.
 
 ## Regles de couverture UI
 
