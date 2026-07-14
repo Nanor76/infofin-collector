@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -37,8 +38,141 @@ def test_build_romania_listing_url() -> None:
     assert (
         url
         == "https://oam.asfromania.ro/oam/loadedPDFReportsForPublic.jsp?"
-        "xF4F59A60sortDir=desc&xF4F59A60sortColumn=refdate&xF4F59A60page=2"
+        "xF4F59A60sortDir=desc&xF4F59A60sortColumn=refdate&"
+        "xF4F59A60currentPage=2&xF4F59A60startLink=1"
     )
+
+
+def _listing_html(
+    rows: list[tuple[str, str, str, str]],
+    *,
+    total: int,
+) -> str:
+    rendered_rows = []
+    for record_id, title, period_type, published_at in rows:
+        rendered_rows.append(
+            f"""
+            <tr>
+              <td>Issuer {record_id}</td><td>123</td><td>RO{record_id:0>10}</td>
+              <td>Details</td><td>{title}</td><td>{period_type}</td>
+              <td>2025</td><td>{published_at} 08:00</td><td></td>
+              <td>Prima incarcare</td><td>ro</td>
+              <td><a href="DownloadPDFFile.do?nume_raportare={record_id}.pdf">PDF</a></td>
+            </tr>
+            """
+        )
+    return f"<html><body><b>Total: {total}</b><table>{''.join(rendered_rows)}</table></body></html>"
+
+
+class _FakeResponse:
+    status_code = 200
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _FilteredListingSession:
+    def __init__(self) -> None:
+        annual_rows = [
+            (f"annual-{index}", "Raport Financiar Anual", "anuala", "2026-04-30")
+            for index in range(1, 12)
+        ]
+        self.pages = {
+            "16": (
+                _listing_html(annual_rows[:10], total=11),
+                _listing_html(annual_rows[10:], total=11),
+            ),
+            "15": (
+                _listing_html(
+                    [("half-1", "Raport semestrial", "semestriala", "2026-02-15")],
+                    total=1,
+                ),
+            ),
+            "14": (
+                _listing_html(
+                    [("quarter-1", "Raport trimestrial", "trimestriala", "2026-05-15")],
+                    total=1,
+                ),
+            ),
+        }
+        self.active_period = "16"
+        self.post_payloads: list[dict[str, str]] = []
+        self.get_urls: list[str] = []
+
+    def post(self, url: str, **kwargs: object) -> _FakeResponse:
+        payload = dict(kwargs["data"])
+        self.post_payloads.append(payload)
+        self.active_period = payload["xF4F59A60sqlPPERIODICITATE"]
+        return _FakeResponse(self.pages[self.active_period][0])
+
+    def get(self, url: str, **kwargs: object) -> _FakeResponse:
+        self.get_urls.append(url)
+        query = parse_qs(urlparse(url).query)
+        page = int((query.get("xF4F59A60currentPage") or ["1"])[0])
+        pages = self.pages[self.active_period]
+        return _FakeResponse(pages[min(page - 1, len(pages) - 1)])
+
+
+def test_filtered_search_covers_all_periodic_types_and_real_pagination() -> None:
+    session = _FilteredListingSession()
+    connector = RomaniaAsfOamConnector(
+        session=session,
+        rate_limit_seconds=0,
+        max_pages=2,
+    )
+
+    candidates = connector.search_recent_documents_filtered(
+        "Bucharest Stock Exchange",
+        since=date(2025, 7, 13),
+        until=date(2026, 7, 13),
+        document_types=(
+            "annual_financial_report",
+            "half_year_financial_report",
+            "quarterly_financial_report",
+        ),
+        limit=100,
+    )
+
+    assert [
+        payload["xF4F59A60sqlPPERIODICITATE"]
+        for payload in session.post_payloads
+    ] == ["16", "15", "14"]
+    assert all(
+        payload["xF4F59A60sqlPS_START_DATE"] == "13/07/2025"
+        and payload["xF4F59A60sqlPE_START_DATE"] == "13/07/2026"
+        for payload in session.post_payloads
+    )
+    assert any(
+        "xF4F59A60currentPage=2" in url
+        and "xF4F59A60startLink=1" in url
+        for url in session.get_urls
+    )
+    assert len(candidates) == 13
+    assert {candidate.document_type for candidate in candidates} == {
+        "annual_financial_report",
+        "half_year_financial_report",
+        "quarterly_financial_report",
+    }
+
+
+def test_filtered_search_rejects_an_incomplete_page_budget() -> None:
+    connector = RomaniaAsfOamConnector(
+        session=_FilteredListingSession(),
+        rate_limit_seconds=0,
+        max_pages=1,
+    )
+
+    with pytest.raises(RuntimeError, match="ROMANIA_ASF_OAM_MAX_PAGES=1"):
+        connector.search_recent_documents_filtered(
+            "Bucharest Stock Exchange",
+            since=date(2025, 7, 13),
+            until=date(2026, 7, 13),
+            document_types=("annual_financial_report",),
+            limit=100,
+        )
 
 
 def test_listing_parsing_finds_petrom_quarterly_report() -> None:

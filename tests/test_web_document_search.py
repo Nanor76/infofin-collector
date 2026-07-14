@@ -114,6 +114,58 @@ def test_search_links_filters_dates_and_dedupes(tmp_path: Path) -> None:
     assert session.closed is True
 
 
+def test_search_links_forwards_source_date_and_document_type_filters(
+    tmp_path: Path,
+) -> None:
+    class FilterAwareConnector(FakeSourceFirstConnector):
+        def __init__(self) -> None:
+            super().__init__([])
+            self.filtered_calls = []
+
+        def search_recent_documents_filtered(
+            self,
+            market: str,
+            since: date | None = None,
+            until: date | None = None,
+            document_types: tuple[str, ...] = (),
+            limit: int | None = None,
+        ) -> list[DocumentCandidate]:
+            self.filtered_calls.append(
+                (market, since, until, document_types, limit)
+            )
+            return []
+
+    connector = FilterAwareConnector()
+    requested_types = (
+        "annual_financial_report",
+        "half_year_financial_report",
+        "quarterly_financial_report",
+    )
+
+    DocumentSearchService(
+        make_settings(tmp_path),
+        session_factory=lambda **kwargs: FakeSession(),
+        connector_factory=lambda market, **kwargs: connector,
+    ).search_links(
+        LinkSearchRequest(
+            markets=("Bucharest Stock Exchange",),
+            date_from=date(2025, 7, 13),
+            date_to=date(2026, 7, 13),
+            document_types=requested_types,
+        )
+    )
+
+    assert connector.filtered_calls == [
+        (
+            "Bucharest Stock Exchange",
+            date(2025, 7, 13),
+            date(2026, 7, 13),
+            requested_types,
+            100000,
+        )
+    ]
+
+
 def test_search_links_connector_error_does_not_block_other_markets(
     tmp_path: Path,
 ) -> None:

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import date
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Callable
 from urllib.parse import urlparse
 
 from connectors import connector_for_market
-from connectors.base import Connector, DocumentCandidate
+from connectors.base import DocumentCandidate
 from http_client import build_http_session
 from load_watchlist import normalize_market
 from webapp.services.filters import filter_documents
@@ -212,9 +212,11 @@ class DocumentSearchService:
                 return market_documents, summary, None, error
 
             try:
-                candidates = connector.search_recent_documents(
+                candidates = connector.search_recent_documents_filtered(
                     normalized_market,
                     since=request.date_from,
+                    until=request.date_to,
+                    document_types=request.document_types,
                     limit=request.max_candidates,
                 )
             except Exception as exc:

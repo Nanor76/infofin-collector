@@ -39,6 +39,12 @@ test("la recherche permet de sélectionner les critères et affiche les résulta
   await page
     .getByTestId("search-document-type-option-annual-financial-report")
     .click();
+  await page
+    .getByTestId("search-document-type-option-half-year-financial-report")
+    .click();
+  await page
+    .getByTestId("search-document-type-option-quarterly-financial-report")
+    .click();
 
   const requestPromise = page.waitForRequest(
     (request) =>
@@ -50,7 +56,11 @@ test("la recherche permet de sélectionner les critères et affiche les résulta
     markets: ["Euronext Paris"],
     date_from: "2026-06-01",
     date_to: "2026-06-30",
-    document_types: ["annual_financial_report"],
+    document_types: [
+      "annual_financial_report",
+      "half_year_financial_report",
+      "quarterly_financial_report",
+    ],
   });
 
   await expect(page).toHaveURL(/\/searches\/e2e-[a-f0-9]{32}$/);
@@ -58,6 +68,24 @@ test("la recherche permet de sélectionner les critères et affiche les résulta
   await expect(page.getByTestId("results-job-indexed-count")).toHaveText("51");
   await expect(page.getByTestId("results-total-count")).toHaveText("51");
   await expect(page.getByTestId("results-document-row")).toHaveCount(50);
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Annuel" })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Semestriel" })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Trimestriel" })
+      .first(),
+  ).toBeVisible();
 });
 
 test("la sélection rapide, la carte et la validation restent synchronisées", async ({

@@ -84,6 +84,7 @@ teste sans navigateur.
 | Cas | Responsabilite |
 | --- | --- |
 | `test_search_links_filters_dates_and_dedupes` | filtrage des dates et deduplication |
+| `test_search_links_forwards_source_date_and_document_type_filters` | transmission des bornes et types aux connecteurs capables de filtrer a la source |
 | `test_search_links_connector_error_does_not_block_other_markets` | isolation d'une erreur entre marches |
 | `test_search_links_dedupe_url_aggregates_markets` | aggregation des marches par URL |
 | `test_search_links_closes_session_on_connector_exception` | fermeture de session apres exception |
@@ -131,7 +132,7 @@ Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
 
 | Cas | Responsabilites protegees | Fixtures principales |
 | --- | --- | --- |
-| `la recherche permet de sélectionner les critères et affiche les résultats` | carte chargee, criteres, payload POST, navigation, statut et premiere page | 51 rapports annuels |
+| `la recherche permet de sélectionner les critères et affiche les résultats` | carte chargee, criteres periodiques annuel/semestriel/trimestriel, payload POST, navigation, statut et premiere page | 51 rapports periodiques |
 | `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
 | `les filtres HTMX couvrent le type, le texte et l'état vide` | absence du filtre ISIN redondant, filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
 | `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |

@@ -5,9 +5,10 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from math import ceil
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import parse_qs, unquote, urljoin, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,6 +23,12 @@ DOWNLOAD_PATH = "/oam/DownloadPDFFile.do"
 PERIODIC_PERIOD_TYPES = frozenset({"anuala", "semestriala", "trimestriala"})
 DISCOVER_FALLBACK_ISSUER_QUERIES = ("PETROM", "Transilvania", "Romgaz", "Hidroelectrica")
 SUPPORTED_FORMATS = {"pdf"}
+LISTING_PAGE_SIZE = 10
+PERIODIC_DOCUMENT_FILTERS = (
+    ("annual_financial_report", "16"),
+    ("half_year_financial_report", "15"),
+    ("quarterly_financial_report", "14"),
+)
 
 NEGATIVE_TERMS = (
     "prospectus",
@@ -169,14 +176,51 @@ def build_romania_listing_url(
     page: int = 1,
     base_url: str = DEFAULT_BASE_URL,
 ) -> str:
-    params = [
-        ("xF4F59A60sortDir", "desc"),
-        ("xF4F59A60sortColumn", sort_column),
-    ]
+    params = []
+    if sort_column:
+        params.extend(
+            (
+                ("xF4F59A60sortDir", "desc"),
+                ("xF4F59A60sortColumn", sort_column),
+            )
+        )
     if page > 1:
-        params.append(("xF4F59A60page", str(page)))
+        params.extend(
+            (
+                ("xF4F59A60currentPage", str(page)),
+                (
+                    "xF4F59A60startLink",
+                    str(((page - 1) // LISTING_PAGE_SIZE) * LISTING_PAGE_SIZE + 1),
+                ),
+            )
+        )
     query = "&".join(f"{key}={value}" for key, value in params)
     return f"{base_url.rstrip('/')}{LISTING_PATH}?{query}"
+
+
+def _romania_filter_payload(
+    *,
+    periodicity_id: str,
+    since: date,
+    until: date,
+) -> dict[str, str]:
+    return {
+        "xF4F59A60showFilter": "true",
+        "xF4F59A60showCol": "",
+        "xF4F59A60sqlPCUI": "",
+        "xF4F59A60sqlPCOD_ISI": "",
+        "xF4F59A60sqlPBANKID": "NULL",
+        "xF4F59A60sqlPPERIODICITATE": periodicity_id,
+        "xF4F59A60sqlPS_REFDATE": "",
+        "xF4F59A60sqlPE_REFDATE": "",
+        "xF4F59A60sqlPS_START_DATE": since.strftime("%d/%m/%Y"),
+        "xF4F59A60sqlPE_START_DATE": until.strftime("%d/%m/%Y"),
+        "xF4F59A60sqlPREASON": "",
+        "xF4F59A60sqlPTIPRAPORTAREID": "NULL",
+        "xF4F59A60sqlPLANGUAGE": "NULL",
+        "xF4F59A60sqlPTIP_INCARCARE": "NULL",
+        "xF4F59A60sqlPACTIUNI_OBLIGATIUNI": "NULL",
+    }
 
 
 def classify_romania_document(
@@ -437,6 +481,7 @@ class RomaniaNotice:
 @dataclass(frozen=True, slots=True)
 class RomaniaListingPage:
     notices: tuple[RomaniaNotice, ...]
+    total_count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -500,6 +545,8 @@ def parse_romania_listing(
     soup = BeautifulSoup(html_text, "html.parser")
     notices: list[RomaniaNotice] = []
     parent_url = listing_url or f"{base_url.rstrip('/')}{LISTING_PATH}"
+    total_match = re.search(r"\bTotal:\s*(\d+)", soup.get_text(" ", strip=True))
+    total_count = int(total_match.group(1)) if total_match else None
 
     for row in soup.find_all("tr"):
         cells = row.find_all("td", recursive=False)
@@ -555,7 +602,7 @@ def parse_romania_listing(
             )
         )
 
-    return RomaniaListingPage(notices=tuple(notices))
+    return RomaniaListingPage(notices=tuple(notices), total_count=total_count)
 
 
 class RomaniaAsfOamConnector(Connector):
@@ -572,7 +619,7 @@ class RomaniaAsfOamConnector(Connector):
         lookback_days: int = 365,
         timeout: int = 30,
         verify_ssl: bool = True,
-        max_pages: int = 3,
+        max_pages: int = 100,
     ) -> None:
         self.session = session
         self.base_url = base_url.rstrip("/")
@@ -586,7 +633,9 @@ class RomaniaAsfOamConnector(Connector):
         self.last_error: str | None = None
         self.attempts: list[EndpointAttempt] = []
         self._last_request_at = 0.0
-        self._listing_cache: dict[str, tuple[RomaniaNotice, ...]] = {}
+        self._filtered_listing_cache: dict[
+            tuple[str, date, date, int | None], tuple[RomaniaNotice, ...]
+        ] = {}
         self._notice_cache: dict[str, RomaniaNotice] = {}
         self._scanned_notices = 0
         self._details_visited = 0
@@ -615,75 +664,110 @@ class RomaniaAsfOamConnector(Connector):
         finally:
             self._last_request_at = time.monotonic()
 
-    def _fetch_listing_page(
+    def _fetch_recent_notices(
         self,
         *,
-        sort_column: str,
-        page: int,
+        since: date | None,
+        limit: int | None,
     ) -> tuple[RomaniaNotice, ...]:
-        cache_key = f"{sort_column}:{page}"
-        if cache_key in self._listing_cache:
-            self._cache_hits += 1
-            return self._listing_cache[cache_key]
+        end = date.today()
+        start = since or (end - timedelta(days=self.lookback_days))
+        return self._fetch_periodic_notices(
+            since=start,
+            until=end,
+            document_types=(),
+            limit=limit,
+        )
 
+    def _fetch_filtered_listing_page(
+        self,
+        *,
+        document_type: str,
+        periodicity_id: str,
+        since: date,
+        until: date,
+        page: int,
+    ) -> RomaniaListingPage:
         self._bootstrap_session()
-        listing_url = build_romania_listing_url(
-            sort_column=sort_column,
-            page=page,
-            base_url=self.base_url,
+        listing_url = (
+            self.listing_url
+            if page == 1
+            else build_romania_listing_url(
+                sort_column="",
+                page=page,
+                base_url=self.base_url,
+            )
         )
         self._wait()
         response: Any | None = None
         try:
-            response = self.session.get(
-                listing_url,
-                headers={
-                    "Accept": "text/html,application/xhtml+xml",
-                    "Referer": self.listing_url,
-                },
-                timeout=self.timeout,
-                verify=self.verify_ssl,
-            )
+            if page == 1:
+                response = self.session.post(
+                    self.listing_url,
+                    data=_romania_filter_payload(
+                        periodicity_id=periodicity_id,
+                        since=since,
+                        until=until,
+                    ),
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml",
+                        "Referer": f"{self.listing_url}?xF4F59A60showFilter=true",
+                    },
+                    timeout=self.timeout,
+                    verify=self.verify_ssl,
+                )
+            else:
+                response = self.session.get(
+                    listing_url,
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml",
+                        "Referer": self.listing_url,
+                    },
+                    timeout=self.timeout,
+                    verify=self.verify_ssl,
+                )
             response.raise_for_status()
             parsed = parse_romania_listing(
                 response.text,
                 base_url=self.base_url,
                 listing_url=listing_url,
             )
-            result = tuple(parsed.notices)
-            self._listing_cache[cache_key] = result
-            for notice in result:
+            for notice in parsed.notices:
                 self._notice_cache[notice.record_id] = notice
-            self._scanned_notices += len(result)
+            self._scanned_notices += len(parsed.notices)
             self.attempts.append(
                 EndpointAttempt(
                     name=(
-                        f"ASF OAM Romania listing {sort_column} page {page}"
+                        f"ASF OAM Romania filtered {document_type} page {page}"
                     ),
                     base_url=self.base_url,
                     dataset="OAM",
                     endpoint=LISTING_PATH,
-                    method="GET",
+                    method="POST" if page == 1 else "GET",
                     http_status=response.status_code,
                     success=True,
-                    total_count=len(result),
+                    total_count=(
+                        parsed.total_count
+                        if parsed.total_count is not None
+                        else len(parsed.notices)
+                    ),
                 )
             )
             self.state = ConnectorState.READY
             self.last_error = None
-            return result
+            return parsed
         except Exception as exc:
             self.state = ConnectorState.UNAVAILABLE
             self.last_error = str(exc)
             self.attempts.append(
                 EndpointAttempt(
                     name=(
-                        f"ASF OAM Romania listing {sort_column} page {page}"
+                        f"ASF OAM Romania filtered {document_type} page {page}"
                     ),
                     base_url=self.base_url,
                     dataset="OAM",
                     endpoint=LISTING_PATH,
-                    method="GET",
+                    method="POST" if page == 1 else "GET",
                     http_status=getattr(response, "status_code", None),
                     success=False,
                     error=str(exc),
@@ -693,30 +777,115 @@ class RomaniaAsfOamConnector(Connector):
         finally:
             self._last_request_at = time.monotonic()
 
-    def _fetch_recent_notices(
+    def _fetch_period_type_notices(
         self,
         *,
-        since: date | None,
+        document_type: str,
+        periodicity_id: str,
+        since: date,
+        until: date,
+        limit: int | None,
+    ) -> tuple[RomaniaNotice, ...]:
+        cache_key = (document_type, since, until, limit)
+        cached = self._filtered_listing_cache.get(cache_key)
+        if cached is not None:
+            self._cache_hits += 1
+            return cached
+
+        first_page = self._fetch_filtered_listing_page(
+            document_type=document_type,
+            periodicity_id=periodicity_id,
+            since=since,
+            until=until,
+            page=1,
+        )
+        total_count = first_page.total_count
+        requested_count = total_count
+        if requested_count is not None and limit is not None:
+            requested_count = min(requested_count, limit)
+        required_pages = (
+            max(1, ceil(requested_count / LISTING_PAGE_SIZE))
+            if requested_count is not None
+            else self.max_pages
+        )
+        if required_pages > self.max_pages:
+            raise RuntimeError(
+                "ASF OAM Romania nécessite "
+                f"{required_pages} pages pour {document_type}, au-delà de "
+                f"ROMANIA_ASF_OAM_MAX_PAGES={self.max_pages}"
+            )
+
+        notices = list(first_page.notices)
+        for page in range(2, required_pages + 1):
+            parsed = self._fetch_filtered_listing_page(
+                document_type=document_type,
+                periodicity_id=periodicity_id,
+                since=since,
+                until=until,
+                page=page,
+            )
+            notices.extend(parsed.notices)
+            if total_count is None and len(parsed.notices) < LISTING_PAGE_SIZE:
+                break
+
+        if total_count is None and required_pages == self.max_pages:
+            last_page_size = (
+                len(notices) % LISTING_PAGE_SIZE or LISTING_PAGE_SIZE
+            )
+            if last_page_size == LISTING_PAGE_SIZE and (
+                limit is None or len(notices) < limit
+            ):
+                raise RuntimeError(
+                    "ASF OAM Romania pagination potentiellement incomplète; "
+                    "augmenter ROMANIA_ASF_OAM_MAX_PAGES"
+                )
+
+        filtered = tuple(
+            notice
+            for notice in notices
+            if notice.published_at is not None
+            and since <= notice.published_at <= until
+            and self._accepted_notice(notice)
+        )
+        if limit is not None:
+            filtered = filtered[:limit]
+        self._filtered_listing_cache[cache_key] = filtered
+        return filtered
+
+    def _fetch_periodic_notices(
+        self,
+        *,
+        since: date,
+        until: date,
+        document_types: tuple[str, ...],
         limit: int | None,
     ) -> tuple[RomaniaNotice, ...]:
         collected: list[RomaniaNotice] = []
         seen: set[str] = set()
-        for sort_column in ("refdate", "Time"):
-            for page in range(1, self.max_pages + 1):
-                for notice in self._fetch_listing_page(
-                    sort_column=sort_column,
-                    page=page,
-                ):
-                    if notice.record_id in seen:
-                        continue
-                    if since and notice.published_at and notice.published_at < since:
-                        continue
-                    if not self._accepted_notice(notice):
-                        continue
-                    seen.add(notice.record_id)
-                    collected.append(notice)
-                    if limit is not None and len(collected) >= limit:
-                        return tuple(collected)
+        requested_types = set(document_types)
+        selected_filters = [
+            (document_type, periodicity_id)
+            for document_type, periodicity_id in PERIODIC_DOCUMENT_FILTERS
+            if not requested_types or document_type in requested_types
+        ]
+        for document_type, periodicity_id in selected_filters:
+            remaining = None if limit is None else limit - len(collected)
+            if remaining is not None and remaining <= 0:
+                break
+            notices = self._fetch_period_type_notices(
+                document_type=document_type,
+                periodicity_id=periodicity_id,
+                since=since,
+                until=until,
+                limit=remaining,
+            )
+            for notice in notices:
+                if notice.record_id in seen:
+                    continue
+                seen.add(notice.record_id)
+                collected.append(notice)
+                if limit is not None and len(collected) >= limit:
+                    return tuple(collected)
         return tuple(collected)
 
     def _accepted_notice(self, notice: RomaniaNotice) -> bool:
@@ -899,11 +1068,36 @@ class RomaniaAsfOamConnector(Connector):
         since: date | None = None,
         limit: int | None = None,
     ) -> list[DocumentCandidate]:
+        return self.search_recent_documents_filtered(
+            market,
+            since=since,
+            until=date.today(),
+            document_types=(),
+            limit=limit,
+        )
+
+    def search_recent_documents_filtered(
+        self,
+        market: str,
+        since: date | None = None,
+        until: date | None = None,
+        document_types: tuple[str, ...] = (),
+        limit: int | None = None,
+    ) -> list[DocumentCandidate]:
         if market.casefold() != self.market.casefold():
             return []
         end = date.today()
+        if until is not None:
+            end = min(end, until)
         start = since or (end - timedelta(days=self.lookback_days))
-        notices = self._fetch_recent_notices(since=start, limit=limit)
+        if start > end:
+            return []
+        notices = self._fetch_periodic_notices(
+            since=start,
+            until=end,
+            document_types=document_types,
+            limit=limit,
+        )
         candidates = [self._notice_candidate(notice) for notice in notices]
         return candidates[:limit] if limit is not None else candidates
 
@@ -915,7 +1109,12 @@ class RomaniaAsfOamConnector(Connector):
         start = end - timedelta(days=self.lookback_days)
         expected = _normalize_issuer(issuer.name)
         isin_expected = str(issuer.isin or "").strip().casefold()
-        notices = self._fetch_recent_notices(since=start, limit=None)
+        notices = self._fetch_periodic_notices(
+            since=start,
+            until=end,
+            document_types=(),
+            limit=None,
+        )
         matched: list[DocumentCandidate] = []
         for notice in notices:
             observed = _normalize_issuer(notice.issuer_name)
@@ -939,7 +1138,7 @@ class RomaniaAsfOamConnector(Connector):
         isin_expected = str(issuer.isin or "").strip().casefold()
         try:
             best: tuple[float, RomaniaNotice] | None = None
-            for notice in self._fetch_recent_notices(since=None, limit=200):
+            for notice in self._fetch_recent_notices(since=None, limit=None):
                 observed = _normalize_issuer(notice.issuer_name)
                 isin_observed = str(notice.isin or "").strip().casefold()
                 score = 0.0
@@ -992,13 +1191,25 @@ class RomaniaAsfOamConnector(Connector):
         try:
             notices: list[RomaniaNotice] = []
             seen: set[str] = set()
+            document_types_by_period = {
+                "anuala": ("annual_financial_report",),
+                "semestriala": ("half_year_financial_report",),
+                "trimestriala": ("quarterly_financial_report",),
+            }
+            end = date.today()
+            recent_notices = self._fetch_periodic_notices(
+                since=end - timedelta(days=self.lookback_days),
+                until=end,
+                document_types=document_types_by_period.get(period_filter, ()),
+                limit=None,
+            )
             queries = (
                 (issuer_query,)
                 if issuer_query
                 else DISCOVER_FALLBACK_ISSUER_QUERIES
             )
             for issuer_name in queries:
-                for notice in self._fetch_recent_notices(since=None, limit=limit * 4):
+                for notice in recent_notices:
                     if notice.record_id in seen:
                         continue
                     if period_filter and _normalize(notice.period_type) != period_filter:
@@ -1039,7 +1250,7 @@ class RomaniaAsfOamConnector(Connector):
 
     def diagnose(self) -> RomaniaSourceDiagnostic:
         try:
-            notices = list(self._fetch_recent_notices(since=None, limit=200))
+            notices = list(self._fetch_recent_notices(since=None, limit=None))
             categories: dict[str, int] = {}
             for notice in notices:
                 key = notice.period_type or "unknown"
@@ -1160,7 +1371,15 @@ class RomaniaAsfOamConnector(Connector):
         since: date | None,
         limit: int | None,
     ) -> int:
-        return self.max_pages * 2
+        page_budget = self.max_pages * len(PERIODIC_DOCUMENT_FILTERS)
+        if limit is not None:
+            page_budget = min(
+                page_budget,
+                ceil(limit / LISTING_PAGE_SIZE)
+                + len(PERIODIC_DOCUMENT_FILTERS)
+                - 1,
+            )
+        return 1 + page_budget
 
     def estimate_issuer_http_requests(self, issuer: Issuer) -> int:
-        return self.max_pages * 2
+        return 1 + self.max_pages * len(PERIODIC_DOCUMENT_FILTERS)

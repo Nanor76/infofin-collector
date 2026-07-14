@@ -188,7 +188,7 @@ class Settings:
     romania_asf_oam_lookback_days: int = 365
     romania_asf_oam_rate_limit_seconds: float = 0.5
     romania_asf_oam_verify_ssl: bool = True
-    romania_asf_oam_max_pages: int = 3
+    romania_asf_oam_max_pages: int = 100
     bulgaria_bse_x3news_base_url: str = "https://download.bse-sofia.bg"
     bulgaria_bse_x3news_lookback_days: int = 365
     bulgaria_bse_x3news_rate_limit_seconds: float = 0.5
@@ -617,7 +617,7 @@ class Settings:
             ).lower() != "false",
             romania_asf_oam_max_pages=max(
                 1,
-                _env_int("ROMANIA_ASF_OAM_MAX_PAGES", 3),
+                _env_int("ROMANIA_ASF_OAM_MAX_PAGES", 100),
             ),
             bulgaria_bse_x3news_base_url=os.getenv(
                 "BULGARIA_BSE_X3NEWS_BASE_URL",

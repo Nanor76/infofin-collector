@@ -118,6 +118,17 @@ class Connector(ABC):
             f"{self.source_name} ne supporte pas le mode source-first"
         )
 
+    def search_recent_documents_filtered(
+        self,
+        market: str,
+        since: date | None = None,
+        until: date | None = None,
+        document_types: tuple[str, ...] = (),
+        limit: int | None = None,
+    ) -> list[DocumentCandidate]:
+        """Use source-side filters when available, otherwise filter downstream."""
+        return self.search_recent_documents(market, since=since, limit=limit)
+
     def search_documents_for_issuer(
         self,
         issuer: Issuer,

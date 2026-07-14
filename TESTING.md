@@ -93,7 +93,7 @@ La couverture essentielle est repartie ainsi :
 
 | Parcours | Verifications principales |
 | --- | --- |
-| Recherche | chargement de la carte, selection d'un marche, dates, type de document, payload API, navigation et resultats |
+| Recherche | chargement de la carte, selection d'un marche, dates, types periodiques annuel/semestriel/trimestriel, payload API, navigation et resultats |
 | Selection | boutons Tous/Aucun, synchronisation carte-liste et validation sans marche |
 | Filtres | absence du filtre ISIN redondant, mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
 | Resultats | tri, pagination aller-retour et telechargement CSV |
