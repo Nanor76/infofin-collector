@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import tempfile
 from datetime import date
@@ -15,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from config import Settings  # noqa: E402
 from webapp.app import create_app  # noqa: E402
+from webapp.beta_access import hash_password  # noqa: E402
 from webapp.firestore_repository import (  # noqa: E402
     FirestoreWebSearchRepository,
     InMemoryDocumentStore,
@@ -33,9 +35,13 @@ class DeterministicJobManager:
     def __init__(self, repository: FirestoreWebSearchRepository) -> None:
         self.repository = repository
 
-    def submit(self, request: LinkSearchRequest) -> str:
+    def submit(
+        self,
+        request: LinkSearchRequest,
+        owner_id: str | None = None,
+    ) -> str:
         job_id = f"e2e-{uuid4().hex}"
-        self.repository.create_job(job_id, request)
+        self.repository.create_job(job_id, request, owner_id=owner_id)
         if request.query == "queued-fixture":
             return job_id
         documents = self._documents_for(request)
@@ -177,8 +183,23 @@ def build_app():
         google_cloud_project="infofin-e2e",
         cloud_tasks_queue="infofin-search-queue",
         web_service_url="http://127.0.0.1:8766",
-        web_access_username="e2e-user",
-        web_access_password="e2e-password",
+        web_beta_users_json=json.dumps(
+            {
+                "e2e-user": {
+                    "display_name": "Testeur E2E",
+                    "password_hash": hash_password(
+                        "e2e secure password",
+                        salt=b"e2e-fixed-salt!!",
+                        iterations=1_000,
+                    ),
+                }
+            }
+        ),
+        web_beta_session_secret="e2e-session-secret-32-characters!!",
+        web_beta_daily_search_limit=100,
+        web_worker_token="e2e-worker-token-32-characters!!!!",
+        web_contact_email="beta@example.test",
+        web_legal_publisher="InfoFin E2E",
     )
     repository = FirestoreWebSearchRepository(
         store=InMemoryDocumentStore(),

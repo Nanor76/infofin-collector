@@ -95,12 +95,14 @@ La couverture essentielle est repartie ainsi :
 
 | Parcours | Verifications principales |
 | --- | --- |
-| Recherche | refus HTTP sans mot de passe, accès HTTP Basic, sante locale SQLite/local, chargement de la carte, selection d'un marche, dates, types periodiques annuel/semestriel/trimestriel, payload API, navigation, resultats et exclusion stricte des autres periodicites |
+| Authentification | refus sans session, connexion individuelle à la bêta, isolation des recherches, quota 24 h, déconnexion et jeton worker distinct |
+| Recherche | sante locale SQLite/local, chargement de la carte, selection d'un marche, dates, types periodiques annuel/semestriel/trimestriel, payload API, navigation, resultats et exclusion stricte des autres periodicites |
 | Statut initial | etat technique `queued` expose comme `running`, puis transition vers « Terminée » par le worker interne chaud |
 | Selection | boutons Tous/Aucun, synchronisation carte-liste et validation sans marche |
 | Filtres | absence du filtre ISIN redondant, mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
 | Resultats | tri, pagination aller-retour, telechargement CSV et stabilité du défilement horizontal mobile après l'arrêt du polling |
 | Confidentialite | champs techniques de collecte absents des pages, de l'API et des exports ; ouverture directe de l'adresse officielle du document |
+| Retours bêta | formulaire attribué au compte connecté, lié à la recherche et confirmation visible sans rechargement |
 
 ### Installation et execution
 
@@ -270,6 +272,11 @@ associee a une cle metier stable, cette cle complete l'identifiant :
 search-market-option-euronext-paris
 search-market-checkbox-euronext-paris
 search-map-country-fr
+login-username-input
+login-password-input
+search-beta-quota-state
+results-feedback-form
+results-feedback-response-state
 ```
 
 Les noms de marches sont translitteres en ASCII puis normalises en kebab-case par

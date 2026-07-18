@@ -29,7 +29,12 @@ def main() -> int:
         prefix=settings.firestore_collection_prefix,
     )
     deleted = repository.purge_jobs_older_than(cutoff)
+    feedback_cutoff = (
+        datetime.now(UTC) - timedelta(days=365)
+    ).isoformat(timespec="seconds")
+    deleted_feedback = repository.purge_feedback_older_than(feedback_cutoff)
     print(f"{deleted} recherche(s) Firestore supprimée(s)")
+    print(f"{deleted_feedback} retour(s) bêta Firestore supprimé(s)")
     return 0
 
 

@@ -36,6 +36,11 @@ export const test = base.extend({
         body: "%PDF-1.7 e2e fixture",
       }),
     );
+    await page.goto("/login");
+    await page.getByTestId("login-username-input").fill("e2e-user");
+    await page.getByTestId("login-password-input").fill("e2e secure password");
+    await page.getByTestId("login-submit-button").click();
+    await expect(page).toHaveURL(/\/$/);
     await use(page);
     expect(pageErrors, "aucune erreur JavaScript non gérée").toEqual([]);
   },

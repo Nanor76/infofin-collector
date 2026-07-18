@@ -165,6 +165,54 @@ dans les variables ordinaires. Pour retrouver ultérieurement le mot de passe :
 gcloud secrets versions access latest --secret=infofin-web-password
 ```
 
+## Bêta privée avec comptes individuels
+
+Le mot de passe HTTP partagé reste un mode de repli personnel. Pour inviter
+plusieurs testeurs, utiliser des comptes individuels : les mots de passe sont
+hachés PBKDF2, la session est signée dans un cookie `HttpOnly`, chaque
+recherche appartient à son auteur et un quota glissant est appliqué sur 24 h.
+Cloud Tasks utilise un jeton machine distinct.
+
+Créer les trois secrets une première fois :
+
+```powershell
+gcloud secrets create infofin-beta-users --replication-policy=automatic
+gcloud secrets create infofin-beta-session --replication-policy=automatic
+gcloud secrets create infofin-worker-token --replication-policy=automatic
+```
+
+Générer le premier compte sans conserver son mot de passe dans le dépôt :
+
+```powershell
+$UsersJson = python -m webapp.manage_beta --username fondateur --display-name "Fondateur"
+$UsersJson | gcloud secrets versions add infofin-beta-users --data-file=-
+
+$SessionSecret = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+$SessionSecret | gcloud secrets versions add infofin-beta-session --data-file=-
+$WorkerToken = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+$WorkerToken | gcloud secrets versions add infofin-worker-token --data-file=-
+```
+
+Déployer ensuite la bêta sur le worker chaud existant :
+
+```powershell
+.\deploy\google-cloud.ps1 `
+  -ProjectId "mon-projet-google" `
+  -Public `
+  -Performance `
+  -WarmWorker `
+  -BetaUsersSecret "infofin-beta-users" `
+  -BetaSessionSecret "infofin-beta-session" `
+  -WorkerTokenSecret "infofin-worker-token" `
+  -BetaDailySearchLimit 3 `
+  -ContactEmail "contact@example.com" `
+  -LegalPublisher "Nom de l'éditeur"
+```
+
+Les pages légales restent publiques afin d'identifier le service avant la
+connexion. Compléter impérativement le nom réel de l'éditeur et son adresse de
+contact avant de diffuser l'URL sur un forum.
+
 Pour ne pas créer la tâche planifiée :
 
 ```powershell
@@ -189,6 +237,12 @@ INFOFIN_FIRESTORE_PREFIX=infofin_web
 INFOFIN_WEB_MAX_CANDIDATES=1000
 INFOFIN_WEB_ACCESS_USERNAME=infofin
 # INFOFIN_WEB_ACCESS_PASSWORD provient de Secret Manager.
+INFOFIN_BETA_USERS_JSON={...hachages PBKDF2...}
+INFOFIN_BETA_SESSION_SECRET=secret-de-signature
+INFOFIN_BETA_DAILY_SEARCH_LIMIT=3
+INFOFIN_WORKER_TOKEN=secret-machine-cloud-tasks
+INFOFIN_CONTACT_EMAIL=contact@example.com
+INFOFIN_LEGAL_PUBLISHER=Nom de l'éditeur
 POLAND_KNF_OAM_MAX_PAGES_PER_DATE=25
 ```
 

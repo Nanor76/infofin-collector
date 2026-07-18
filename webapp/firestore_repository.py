@@ -163,6 +163,7 @@ class FirestoreWebSearchRepository:
             raise ValueError("Le préfixe Firestore ne peut pas être vide")
         self.store = store
         self.jobs_collection = f"{cleaned_prefix}_jobs"
+        self.feedback_collection = f"{cleaned_prefix}_feedback"
 
     def _job_path(self, job_id: str) -> DocumentPath:
         return (self.jobs_collection, job_id)
@@ -170,11 +171,17 @@ class FirestoreWebSearchRepository:
     def _child_collection(self, job_id: str, name: str) -> DocumentPath:
         return (*self._job_path(job_id), name)
 
-    def create_job(self, job_id: str, request: LinkSearchRequest) -> None:
+    def create_job(
+        self,
+        job_id: str,
+        request: LinkSearchRequest,
+        owner_id: str | None = None,
+    ) -> None:
         self.store.set(
             self._job_path(job_id),
             {
                 "id": job_id,
+                "owner_id": owner_id,
                 "created_at": utc_now(),
                 "started_at": None,
                 "finished_at": None,
@@ -184,6 +191,36 @@ class FirestoreWebSearchRepository:
                 "results_count": 0,
                 "warnings_json": "[]",
                 "errors_json": "[]",
+            },
+        )
+
+    def count_jobs_for_owner_since(self, owner_id: str, cutoff_iso: str) -> int:
+        return sum(
+            1
+            for _, job in self.store.list((self.jobs_collection,))
+            if job.get("owner_id") == owner_id
+            and str(job.get("created_at") or "") >= cutoff_iso
+        )
+
+    def add_feedback(
+        self,
+        *,
+        feedback_id: str,
+        owner_id: str,
+        category: str,
+        message: str,
+        job_id: str | None,
+        created_at: str,
+    ) -> None:
+        self.store.set(
+            (self.feedback_collection, feedback_id),
+            {
+                "id": feedback_id,
+                "owner_id": owner_id,
+                "job_id": job_id,
+                "category": category,
+                "message": message,
+                "created_at": created_at,
             },
         )
 
@@ -387,5 +424,16 @@ class FirestoreWebSearchRepository:
                 for document_id, _ in self.store.list(collection):
                     self.store.delete((*collection, document_id))
             self.store.delete(self._job_path(job_id))
+            deleted += 1
+        return deleted
+
+    def purge_feedback_older_than(self, cutoff_iso: str) -> int:
+        deleted = 0
+        for feedback_id, feedback in self.store.list(
+            (self.feedback_collection,)
+        ):
+            if str(feedback.get("created_at") or "") >= cutoff_iso:
+                continue
+            self.store.delete((self.feedback_collection, feedback_id))
             deleted += 1
         return deleted

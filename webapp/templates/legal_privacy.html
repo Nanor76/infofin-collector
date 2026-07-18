@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}Confidentialité — InfoFin{% endblock %}
+{% block content %}
+<article class="legal-card" data-testid="legal-privacy-page">
+  <h1 data-testid="legal-privacy-heading">Confidentialité</h1>
+  <p>InfoFin traite uniquement les données nécessaires au fonctionnement de la bêta : identifiant de compte, recherches effectuées, retours envoyés, journaux techniques et données de session.</p>
+  <h2>Finalités</h2>
+  <p>Sécuriser l’accès, appliquer les quotas, fournir les résultats, corriger les anomalies et évaluer l’utilité du service.</p>
+  <h2>Conservation</h2>
+  <p>Les recherches et leurs résultats sont supprimés automatiquement après 30 jours. Les retours sont conservés pendant la durée de la bêta, puis au maximum 12 mois pour le suivi des améliorations.</p>
+  <h2>Cookies</h2>
+  <p>Un cookie strictement nécessaire maintient la session. Aucun traceur publicitaire ni outil d’analyse tiers n’est utilisé.</p>
+  <h2>Vos droits</h2>
+  {% if contact_email %}
+  <p>Pour demander l’accès, la rectification ou l’effacement de vos données, écrivez à <a href="mailto:{{ contact_email }}" data-testid="privacy-contact-email-link">{{ contact_email }}</a>.</p>
+  {% else %}
+  <p>Utilisez le contact communiqué dans votre invitation pour exercer vos droits.</p>
+  {% endif %}
+</article>
+{% endblock %}

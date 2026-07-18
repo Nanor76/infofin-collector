@@ -28,6 +28,19 @@ class InternalSearchRunRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=128)
 
 
+class BetaFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(pattern="^(missing|accuracy|usability|speed|feature|other)$")
+    message: str = Field(min_length=3, max_length=2000)
+    job_id: str | None = Field(default=None, max_length=128)
+
+
+class BetaFeedbackResponse(BaseModel):
+    feedback_id: str
+    accepted: bool = True
+
+
 class SearchMarketStatus(BaseModel):
     market: str
     status: str

@@ -7,6 +7,13 @@
     <p class="hero-subtitle">Centralisez vos recherches de documents financiers européens en temps réel.</p>
   </div>
 
+  {% if beta_enabled %}
+  <div class="beta-quota" data-testid="search-beta-quota-state">
+    <strong>Bêta privée</strong>
+    <span><span data-testid="search-beta-quota-used-value">{{ quota_used }}</span> / <span data-testid="search-beta-quota-limit-value">{{ quota_limit }}</span> recherches utilisées sur les dernières 24 heures.</span>
+  </div>
+  {% endif %}
+
   <form id="search-form" class="search-form" data-testid="search-form">
     <!-- Panel 1: Marchés -->
     <div class="form-card market-selection-card" data-testid="search-market-section">

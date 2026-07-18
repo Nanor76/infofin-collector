@@ -1041,6 +1041,11 @@ rétention de 30 jours et une purge quotidienne :
 Le mode worker chaud s'active avec `-Performance -WarmWorker` et la protection
 HTTP documentée dans [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md).
 
+Pour une bêta multi-utilisateur, InfoFin prend également en charge les comptes
+sur invitation, les sessions signées, l'isolation des recherches, un quota par
+compte et un formulaire de retour. La création des secrets et le déploiement
+sont décrits dans la section « Bêta privée avec comptes individuels » du guide.
+
 Voir [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md) pour les prérequis, l'architecture,
 les permissions, la vérification et les limites de coût.
 

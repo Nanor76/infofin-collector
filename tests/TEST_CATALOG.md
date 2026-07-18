@@ -65,7 +65,7 @@ npm run test:e2e:list
 | Groupe | Cas existants | Modifier lorsque |
 | --- | --- | --- |
 | Referentiels | `test_get_markets`, `test_get_document_types`, `test_get_health` | une liste, une valeur ou la sante change |
-| Authentification | `test_password_protects_every_web_route` | défi HTTP Basic global, identifiants ou couverture des routes change |
+| Authentification | `test_password_protects_every_web_route`, `test_beta_pages_keep_stable_interactive_test_ids` | défi HTTP Basic de repli, connexion bêta, pages publiques, compte ou contrat UI change |
 | Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_queued_search_is_publicly_reported_as_running`, `test_get_unknown_search_returns_404`, `test_private_search_controls_are_not_exposed` | payload public, identifiant, statut, erreur ou surface de documentation change |
 | Resultats API | `test_get_search_results_paginates` | pagination, structure JSON ou adresse officielle du document change |
 | Page de recherche | `test_get_home_contains_form`, `test_home_interactive_elements_have_test_ids` | formulaire, controle ou `data-testid` change |
@@ -123,6 +123,7 @@ teste sans navigateur.
 | --- | --- |
 | `test_initialize_web_search_schema` | initialisation du schema |
 | `test_create_and_get_job` | creation et lecture d'un job |
+| `test_owner_quota_and_feedback_are_persisted` | propriétaire, compteur de quota et retour bêta |
 | `test_replace_results_and_list_paginated` | remplacement et pagination |
 | `test_replace_results_overwrites_previous_rows` | ecrasement des anciennes lignes |
 | `test_list_results_filters` | filtres repository |
@@ -137,6 +138,7 @@ teste sans navigateur.
 | `test_firestore_repository_persists_filters_and_purges` | contrat de persistance, filtrage et suppression en cascade sans réseau |
 | `test_cloud_run_launcher_overrides_the_search_job_id` | URL Cloud Run v2 et surcharge isolée de l'identifiant de recherche |
 | `test_cloud_tasks_launcher_targets_the_warm_service` | création d'une tâche HTTP authentifiée vers le worker du service maintenu chaud |
+| `test_cloud_tasks_launcher_uses_a_dedicated_beta_worker_token` | séparation du jeton machine Cloud Tasks et des sessions des bêta-testeurs |
 | `test_cloud_job_manager_persists_before_dispatch` | persistance du job avant son lancement distant |
 | `test_cloud_job_manager_marks_dispatch_failure` | état terminal explicite lorsque l'API Cloud Run est indisponible |
 | `test_cloud_worker_executes_the_persisted_request` | reprise de la requête Firestore et écriture du résultat par le worker |
@@ -144,15 +146,29 @@ teste sans navigateur.
 | `test_cloud_app_uses_shared_repository_without_sqlite` | intégration FastAPI, Firestore et dispatcher sans création de fichier SQLite |
 | `test_google_cloud_deployment_assets_keep_free_tier_guards` | conteneur, worker Cloud Tasks chaud, file séquentielle sans relance, secret mobile et garde-fous de coût |
 
+### Accès bêta — `tests/test_web_beta.py`
+
+| Cas | Responsabilité |
+| --- | --- |
+| `test_beta_passwords_are_hashed_and_verified` | stockage PBKDF2 sans mot de passe en clair |
+| `test_beta_session_is_signed_and_expires` | signature, intégrité et expiration de la session |
+| `test_beta_authentication_rejects_unknown_or_invalid_users` | refus d'un compte ou mot de passe invalide |
+| `test_beta_login_protects_the_app_but_keeps_legal_pages_public` | redirection vers la connexion et accès public aux informations légales |
+| `test_beta_quota_limits_searches_per_user_over_24_hours` | plafond individuel sur une fenêtre glissante de 24 heures |
+| `test_beta_users_cannot_read_another_users_search` | isolation des recherches et résultats entre comptes |
+| `test_beta_feedback_is_attributed_to_the_authenticated_user` | persistance du retour avec compte et recherche associés |
+| `test_beta_worker_requires_its_dedicated_token` | refus des appels anonymes au worker interne |
+
 ## Catalogue Playwright
 
 Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
 
 | Cas | Responsabilites protegees | Fixtures principales |
 | --- | --- | --- |
-| `la recherche permet de sélectionner les critères et affiche les résultats` | refus sans mot de passe, accès HTTP Basic, sante SQLite/local, carte chargee, criteres periodiques annuel/semestriel/trimestriel, payload POST, navigation, statut et premiere page | 51 rapports periodiques |
+| `la recherche permet de sélectionner les critères et affiche les résultats` | refus sans session, connexion bêta, sante SQLite/local, carte chargee, criteres periodiques annuel/semestriel/trimestriel, payload POST, navigation, statut et premiere page | compte invité et 51 rapports periodiques |
 | `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
 | `l'état technique queued est affiché comme une recherche en cours` | état persistant initial masqué derrière `running`, puis transition vers `done` via le worker interne chaud | recherche maintenue en file puis exécutée par l'endpoint Cloud Tasks |
+| `la bêta attribue le quota et le retour au compte connecté` | identité visible, compteur de quota, envoi du retour et confirmation JavaScript | compte invité, recherche déterministe et stockage Firestore mémoire |
 | `une recherche par type exclut les autres périodicités` | filtre annuel strict et absence de rapports semestriels ou trimestriels dans les resultats | 51 rapports annuels |
 | `les filtres HTMX couvrent le type, le texte et l'état vide` | absence du filtre ISIN redondant, filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
 | `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |

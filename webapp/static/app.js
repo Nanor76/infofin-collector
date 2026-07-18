@@ -133,6 +133,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const feedbackForm = document.getElementById("beta-feedback-form");
+  if (feedbackForm) {
+    feedbackForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const responseState = feedbackForm.querySelector(".feedback-state");
+      const submitButton = feedbackForm.querySelector("button[type='submit']");
+      const formData = new FormData(feedbackForm);
+      submitButton.disabled = true;
+      try {
+        const response = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: formData.get("category"),
+            message: formData.get("message"),
+            job_id: feedbackForm.dataset.jobId,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        responseState.hidden = false;
+        if (!response.ok) {
+          responseState.textContent = payload.detail || "Le retour n’a pas pu être envoyé.";
+          responseState.classList.add("error");
+          return;
+        }
+        feedbackForm.reset();
+        responseState.classList.remove("error");
+        responseState.textContent = "Merci, votre retour a bien été enregistré.";
+      } catch (error) {
+        responseState.hidden = false;
+        responseState.classList.add("error");
+        responseState.textContent = "Le retour n’a pas pu être envoyé.";
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  }
+
   // --- Market Selection Map & List Interaction ---
   const searchInput = document.getElementById('market-search');
   if (searchInput) {

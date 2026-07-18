@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block title %}Connexion bêta — InfoFin{% endblock %}
+{% block content %}
+<section class="auth-card" data-testid="login-page">
+  <span class="beta-badge">Bêta privée</span>
+  <h1 data-testid="login-heading">Accéder à InfoFin</h1>
+  <p>Connectez-vous avec les identifiants personnels reçus dans votre invitation.</p>
+  {% if login_error %}
+  <div class="form-error" role="alert" data-testid="login-error-state">
+    Identifiant ou mot de passe incorrect.
+  </div>
+  {% endif %}
+  <form action="/login" method="post" class="auth-form" data-testid="login-form">
+    <input type="hidden" name="next" value="{{ next_path }}">
+    <label for="login-username">Identifiant</label>
+    <input id="login-username" name="username" autocomplete="username" required maxlength="80" data-testid="login-username-input">
+    <label for="login-password">Mot de passe</label>
+    <input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="200" data-testid="login-password-input">
+    <button type="submit" class="btn-primary" data-testid="login-submit-button">Se connecter</button>
+  </form>
+  <p class="auth-help">Pas encore invité ? Contactez la personne qui vous a transmis cette adresse.</p>
+</section>
+{% endblock %}

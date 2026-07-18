@@ -12,6 +12,12 @@ param(
     [switch]$WarmWorker,
     [string]$AccessUsername = "infofin",
     [string]$AccessPasswordSecret = "",
+    [string]$BetaUsersSecret = "",
+    [string]$BetaSessionSecret = "",
+    [string]$WorkerTokenSecret = "",
+    [int]$BetaDailySearchLimit = 3,
+    [string]$ContactEmail = "",
+    [string]$LegalPublisher = "InfoFin",
     [switch]$SkipScheduler
 )
 
@@ -37,14 +43,40 @@ if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
 if ($AccessPasswordSecret -and -not $Public) {
     throw "AccessPasswordSecret nécessite le mode Public."
 }
+if (($BetaUsersSecret -or $BetaSessionSecret) -and -not ($BetaUsersSecret -and $BetaSessionSecret)) {
+    throw "BetaUsersSecret et BetaSessionSecret doivent être fournis ensemble."
+}
+if ($BetaUsersSecret -and -not $Public) {
+    throw "La bêta avec comptes individuels nécessite le mode Public."
+}
+if ($BetaUsersSecret -and -not $WorkerTokenSecret) {
+    throw "La bêta Cloud nécessite WorkerTokenSecret."
+}
+if ($BetaUsersSecret -and $AccessPasswordSecret) {
+    throw "Choisissez les comptes bêta ou l'ancien mot de passe partagé, pas les deux."
+}
+if ($BetaDailySearchLimit -lt 1) {
+    throw "BetaDailySearchLimit doit être supérieur ou égal à 1."
+}
+foreach ($Value in @($ContactEmail, $LegalPublisher)) {
+    if ($Value -match "[,=]") {
+        throw "ContactEmail et LegalPublisher ne doivent contenir ni virgule ni signe égal."
+    }
+}
 if ($AccessUsername -match "[,=]") {
     throw "AccessUsername ne doit contenir ni virgule ni signe égal."
 }
 if ($WarmWorker -and -not $Performance) {
     throw "WarmWorker nécessite Performance pour maintenir le service chaud."
 }
-if ($WarmWorker -and (-not $Public -or -not $AccessPasswordSecret)) {
-    throw "WarmWorker nécessite Public et AccessPasswordSecret."
+if ($WarmWorker -and -not $Public) {
+    throw "WarmWorker nécessite Public."
+}
+if ($WarmWorker -and $BetaUsersSecret -and -not $WorkerTokenSecret) {
+    throw "La bêta WarmWorker nécessite WorkerTokenSecret."
+}
+if ($WarmWorker -and -not $BetaUsersSecret -and -not $AccessPasswordSecret) {
+    throw "WarmWorker nécessite AccessPasswordSecret ou les secrets de bêta."
 }
 
 Invoke-Gcloud config set project $ProjectId
@@ -121,11 +153,19 @@ if ($WarmWorker) {
     }
 }
 
-if ($AccessPasswordSecret) {
-    if (-not (Test-GcloudResource secrets describe $AccessPasswordSecret --project=$ProjectId)) {
-        throw "Le secret Secret Manager '$AccessPasswordSecret' est introuvable."
+foreach ($SecretName in @(
+    $AccessPasswordSecret,
+    $BetaUsersSecret,
+    $BetaSessionSecret,
+    $WorkerTokenSecret
+)) {
+    if (-not $SecretName) {
+        continue
     }
-    Invoke-Gcloud secrets add-iam-policy-binding $AccessPasswordSecret `
+    if (-not (Test-GcloudResource secrets describe $SecretName --project=$ProjectId)) {
+        throw "Le secret Secret Manager '$SecretName' est introuvable."
+    }
+    Invoke-Gcloud secrets add-iam-policy-binding $SecretName `
         --project=$ProjectId `
         --member="serviceAccount:$WebServiceAccount" `
         --role=roles/secretmanager.secretAccessor `
@@ -202,6 +242,16 @@ if ($Performance) {
 if ($AccessPasswordSecret) {
     $WebEnvironment += ",INFOFIN_WEB_ACCESS_USERNAME=$AccessUsername"
     $WebDeployArguments += "--set-secrets=INFOFIN_WEB_ACCESS_PASSWORD=${AccessPasswordSecret}:latest"
+}
+if ($BetaUsersSecret) {
+    $WebEnvironment += ",INFOFIN_BETA_DAILY_SEARCH_LIMIT=$BetaDailySearchLimit,INFOFIN_CONTACT_EMAIL=$ContactEmail,INFOFIN_LEGAL_PUBLISHER=$LegalPublisher"
+    $WebDeployArguments += (
+        "--set-secrets=" +
+        "INFOFIN_BETA_USERS_JSON=${BetaUsersSecret}:latest," +
+        "INFOFIN_BETA_SESSION_SECRET=${BetaSessionSecret}:latest," +
+        "INFOFIN_WORKER_TOKEN=${WorkerTokenSecret}:latest"
+    )
+    $WebDeployArguments += "--remove-secrets=INFOFIN_WEB_ACCESS_PASSWORD"
 }
 $WebDeployArguments += "--set-env-vars=$WebEnvironment"
 Invoke-Gcloud run @WebDeployArguments

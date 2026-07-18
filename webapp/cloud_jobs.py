@@ -80,8 +80,9 @@ class CloudTasksJobLauncher:
         region: str,
         queue_name: str,
         service_url: str,
-        username: str,
-        password: str,
+        username: str = "",
+        password: str = "",
+        worker_token: str = "",
         authorized_session: AuthorizedSession | None = None,
     ) -> None:
         self.project = project
@@ -90,6 +91,7 @@ class CloudTasksJobLauncher:
         self.service_url = service_url.rstrip("/")
         self.username = username
         self.password = password
+        self.worker_token = worker_token
         self._authorized_session = authorized_session
 
     def _session(self) -> AuthorizedSession:
@@ -112,8 +114,13 @@ class CloudTasksJobLauncher:
             f"projects/{self.project}/locations/{self.region}/queues/"
             f"{self.queue_name}"
         )
-        credentials = f"{self.username}:{self.password}".encode("utf-8")
-        authorization = base64.b64encode(credentials).decode("ascii")
+        headers = {"Content-Type": "application/json"}
+        if self.worker_token:
+            headers["X-InfoFin-Worker-Token"] = self.worker_token
+        else:
+            credentials = f"{self.username}:{self.password}".encode("utf-8")
+            authorization = base64.b64encode(credentials).decode("ascii")
+            headers["Authorization"] = f"Basic {authorization}"
         body = base64.b64encode(
             json.dumps({"job_id": job_id}, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
@@ -126,10 +133,7 @@ class CloudTasksJobLauncher:
                     "httpRequest": {
                         "httpMethod": "POST",
                         "url": f"{self.service_url}/internal/search-worker",
-                        "headers": {
-                            "Authorization": f"Basic {authorization}",
-                            "Content-Type": "application/json",
-                        },
+                        "headers": headers,
                         "body": body,
                     },
                 }

@@ -124,5 +124,31 @@
       </div>
     </div>
   </div>
+
+  {% if beta_enabled %}
+  <section class="dashboard-card feedback-card" data-testid="results-feedback-section">
+    <div class="card-header">
+      <div class="header-title">
+        <i data-lucide="message-square" class="header-icon"></i>
+        <h2>Votre retour de bêta-testeur</h2>
+      </div>
+    </div>
+    <form id="beta-feedback-form" data-job-id="{{ job_id }}" data-testid="results-feedback-form">
+      <label for="feedback-category">Sujet</label>
+      <select id="feedback-category" name="category" required data-testid="results-feedback-category-select">
+        <option value="missing">Document manquant</option>
+        <option value="accuracy">Résultat incorrect</option>
+        <option value="usability">Ergonomie</option>
+        <option value="speed">Rapidité</option>
+        <option value="feature">Fonctionnalité souhaitée</option>
+        <option value="other">Autre</option>
+      </select>
+      <label for="feedback-message">Votre remarque</label>
+      <textarea id="feedback-message" name="message" rows="4" minlength="3" maxlength="2000" required placeholder="Décrivez précisément ce que vous attendiez ou ce qui devrait changer…" data-testid="results-feedback-message-input"></textarea>
+      <button type="submit" class="btn-primary" data-testid="results-feedback-submit-button">Envoyer le retour</button>
+      <p class="feedback-state" role="status" hidden data-testid="results-feedback-response-state"></p>
+    </form>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

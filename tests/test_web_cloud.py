@@ -69,6 +69,12 @@ def test_cloud_settings_are_loaded_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("INFOFIN_FIRESTORE_PREFIX", "test_infofin")
     monkeypatch.setenv("INFOFIN_WEB_ACCESS_USERNAME", "mobile-user")
     monkeypatch.setenv("INFOFIN_WEB_ACCESS_PASSWORD", "secret-value")
+    monkeypatch.setenv("INFOFIN_BETA_USERS_JSON", '{"alice":"hash"}')
+    monkeypatch.setenv("INFOFIN_BETA_SESSION_SECRET", "session-secret")
+    monkeypatch.setenv("INFOFIN_BETA_DAILY_SEARCH_LIMIT", "5")
+    monkeypatch.setenv("INFOFIN_WORKER_TOKEN", "worker-secret")
+    monkeypatch.setenv("INFOFIN_CONTACT_EMAIL", "beta@example.test")
+    monkeypatch.setenv("INFOFIN_LEGAL_PUBLISHER", "InfoFin Test")
 
     settings = Settings.from_env()
 
@@ -82,6 +88,12 @@ def test_cloud_settings_are_loaded_from_environment(monkeypatch) -> None:
     assert settings.firestore_collection_prefix == "test_infofin"
     assert settings.web_access_username == "mobile-user"
     assert settings.web_access_password == "secret-value"
+    assert settings.web_beta_users_json == '{"alice":"hash"}'
+    assert settings.web_beta_session_secret == "session-secret"
+    assert settings.web_beta_daily_search_limit == 5
+    assert settings.web_worker_token == "worker-secret"
+    assert settings.web_contact_email == "beta@example.test"
+    assert settings.web_legal_publisher == "InfoFin Test"
 
 
 def test_firestore_repository_persists_filters_and_purges() -> None:
@@ -133,6 +145,18 @@ def test_firestore_repository_persists_filters_and_purges() -> None:
     )
     assert total == 1
     assert results[0]["title"] == "A report"
+
+    repository.add_feedback(
+        feedback_id="feedback-1",
+        owner_id="alice",
+        category="usability",
+        message="Utile",
+        job_id="job-1",
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    assert repository.purge_feedback_older_than(
+        "2026-02-01T00:00:00+00:00"
+    ) == 1
 
     assert repository.purge_jobs_older_than("9999-01-01T00:00:00+00:00") == 1
     assert repository.get_job("job-1") is None
@@ -223,6 +247,27 @@ def test_cloud_tasks_launcher_targets_the_warm_service() -> None:
         "Content-Type": "application/json",
     }
     assert json.loads(base64.b64decode(request["body"])) == {"job_id": "job-123"}
+
+
+def test_cloud_tasks_launcher_uses_a_dedicated_beta_worker_token() -> None:
+    session = _FakeAuthorizedSession()
+    launcher = CloudTasksJobLauncher(
+        project="infofin-test",
+        region="europe-west1",
+        queue_name="infofin-search-queue",
+        service_url="https://infofin-web.example.run.app/",
+        worker_token="worker-secret",
+        authorized_session=session,  # type: ignore[arg-type]
+    )
+
+    launcher.launch("job-beta")
+
+    request = session.calls[0][1]["task"]["httpRequest"]
+    assert request["headers"] == {
+        "X-InfoFin-Worker-Token": "worker-secret",
+        "Content-Type": "application/json",
+    }
+    assert "Authorization" not in request["headers"]
 
 
 class _RecordingLauncher:
@@ -435,6 +480,9 @@ def test_google_cloud_deployment_assets_keep_free_tier_guards() -> None:
     assert "[switch]$Performance" in script
     assert "[switch]$WarmWorker" in script
     assert "[string]$AccessPasswordSecret" in script
+    assert "[string]$BetaUsersSecret" in script
+    assert "[string]$BetaSessionSecret" in script
+    assert "[string]$WorkerTokenSecret" in script
     assert "--no-allow-unauthenticated" in script
     assert "$WebMinInstances = if ($Performance) { 1 } else { 0 }" in script
     assert '"--min-instances=$WebMinInstances"' in script
@@ -463,6 +511,10 @@ def test_google_cloud_deployment_assets_keep_free_tier_guards() -> None:
     assert "secretmanager.googleapis.com" in script
     assert "roles/secretmanager.secretAccessor" in script
     assert "--set-secrets=INFOFIN_WEB_ACCESS_PASSWORD=" in script
+    assert "INFOFIN_BETA_USERS_JSON=" in script
+    assert "INFOFIN_BETA_SESSION_SECRET=" in script
+    assert "INFOFIN_WORKER_TOKEN=" in script
+    assert "INFOFIN_BETA_DAILY_SEARCH_LIMIT=" in script
     assert "--edition=standard" not in script
     assert "'--args=-m,webapp.run_job'" in script
     assert "'--args=-m,webapp.purge_firestore'" in script

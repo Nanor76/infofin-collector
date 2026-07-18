@@ -97,11 +97,12 @@ def test_submit_creates_done_job(tmp_path: Path) -> None:
         ),
     )
     manager, repository, search_service = _make_manager(tmp_path, result_set)
-    job_id = manager.submit(_request())
+    job_id = manager.submit(_request(), owner_id="alice")
     _wait_for_status(manager, job_id, "done")
     job = repository.get_job(job_id)
     assert job is not None
     assert job["results_count"] == 1
+    assert job["owner_id"] == "alice"
     assert search_service.calls == 1
     manager.shutdown()
 

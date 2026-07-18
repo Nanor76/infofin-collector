@@ -26,6 +26,14 @@
         <span>InfoFin</span>
       </a>
       <span class="tagline">Collecteur & Indexateur de Documents Financiers</span>
+      {% if beta_user %}
+      <div class="beta-account" data-testid="layout-beta-account">
+        <span data-testid="layout-beta-user">{{ beta_user.display_name }}</span>
+        <form action="/logout" method="post" data-testid="layout-logout-form">
+          <button type="submit" class="btn-link" data-testid="layout-logout-button">Déconnexion</button>
+        </form>
+      </div>
+      {% endif %}
     </div>
   </header>
   <main class="container" data-testid="layout-main">
@@ -33,7 +41,11 @@
   </main>
   <footer class="site-footer" data-testid="layout-footer">
     <div class="container">
-      <p>&copy; 2026 InfoFin. Tous droits réservés. Interface modernisée pour une expérience premium.</p>
+      <p>&copy; 2026 InfoFin — Bêta privée. Aucun conseil en investissement.</p>
+      <nav class="legal-links" aria-label="Informations légales">
+        <a href="/legal/mentions" data-testid="layout-legal-mentions-link">Mentions légales</a>
+        <a href="/legal/privacy" data-testid="layout-legal-privacy-link">Confidentialité</a>
+      </nav>
     </div>
   </footer>
 </body>

@@ -6,16 +6,28 @@ import re
 import secrets
 import tempfile
 import unicodedata
+import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import quote, urlparse
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import Settings
 from connectors import SUPPORTED_WATCH_MARKETS
 from db import Database
+from db import utc_now
+from webapp.beta_access import BetaAuthenticator, BetaUser
 from webapp.cloud_jobs import CloudRunJobLauncher, CloudTasksJobLauncher
 from webapp.firestore_repository import (
     FirestoreWebSearchRepository,
@@ -24,6 +36,8 @@ from webapp.firestore_repository import (
 from webapp.jobs import CloudJobManager, JobManager, run_stored_search
 from webapp.repositories import WebSearchRepository
 from webapp.schemas import (
+    BetaFeedbackRequest,
+    BetaFeedbackResponse,
     SearchCreateRequest,
     SearchCreateResponse,
     InternalSearchRunRequest,
@@ -144,6 +158,11 @@ def create_app(
     search_service=None,
 ) -> FastAPI:
     resolved_settings = settings or Settings.from_env()
+    beta_authenticator = BetaAuthenticator(
+        users_json=resolved_settings.web_beta_users_json,
+        session_secret=resolved_settings.web_beta_session_secret,
+        session_hours=resolved_settings.web_beta_session_hours,
+    )
     if resolved_settings.web_storage_backend not in {"sqlite", "firestore"}:
         raise ValueError("INFOFIN_WEB_STORAGE_BACKEND doit valoir sqlite ou firestore")
     if resolved_settings.web_job_backend not in {
@@ -159,6 +178,14 @@ def create_app(
         and resolved_settings.web_storage_backend != "firestore"
     ):
         raise ValueError("Les backends cloud nécessitent le stockage firestore")
+    if (
+        beta_authenticator.enabled
+        and resolved_settings.web_job_backend == "cloud-tasks"
+        and len(resolved_settings.web_worker_token) < 32
+    ):
+        raise ValueError(
+            "INFOFIN_WORKER_TOKEN doit contenir au moins 32 caractères en mode bêta"
+        )
 
     resolved_database = database
     resolved_repository = repository
@@ -207,6 +234,7 @@ def create_app(
                     service_url=resolved_settings.web_service_url,
                     username=resolved_settings.web_access_username,
                     password=resolved_settings.web_access_password,
+                    worker_token=resolved_settings.web_worker_token,
                 ),
             )
         else:
@@ -224,7 +252,48 @@ def create_app(
     )
 
     @app.middleware("http")
-    async def require_basic_auth(request: Request, call_next):
+    async def require_access(request: Request, call_next):
+        request.state.beta_user = None
+        if beta_authenticator.enabled:
+            token = request.cookies.get(beta_authenticator.cookie_name, "")
+            request.state.beta_user = beta_authenticator.read_session(token)
+            path = request.url.path
+            public_path = (
+                path == "/login"
+                or path.startswith("/static/")
+                or path.startswith("/legal/")
+            )
+            if path == "/internal/search-worker":
+                supplied_token = request.headers.get(
+                    "x-infofin-worker-token", ""
+                ).encode("utf-8")
+                expected_token = resolved_settings.web_worker_token.encode("utf-8")
+                if not supplied_token or not secrets.compare_digest(
+                    supplied_token, expected_token
+                ):
+                    return PlainTextResponse(
+                        "Accès worker refusé.",
+                        status_code=403,
+                        headers={"Cache-Control": "no-store"},
+                    )
+                return await call_next(request)
+            if public_path or request.state.beta_user is not None:
+                return await call_next(request)
+            if path.startswith("/api/") or path.startswith("/partials/"):
+                return JSONResponse(
+                    {"detail": "Session requise."},
+                    status_code=401,
+                    headers={"Cache-Control": "no-store"},
+                )
+            target = request.url.path
+            if request.url.query:
+                target += f"?{request.url.query}"
+            return RedirectResponse(
+                url=f"/login?next={quote(target, safe='')}",
+                status_code=303,
+                headers={"Cache-Control": "no-store"},
+            )
+
         expected_password = resolved_settings.web_access_password
         if not expected_password:
             return await call_next(request)
@@ -272,6 +341,103 @@ def create_app(
     app.state.database = resolved_database
     app.state.repository = resolved_repository
     app.state.job_manager = resolved_job_manager
+    app.state.beta_authenticator = beta_authenticator
+
+    def current_beta_user(request: Request) -> BetaUser | None:
+        return getattr(request.state, "beta_user", None)
+
+    def ensure_job_access(request: Request, job_id: str) -> dict[str, object]:
+        job = resolved_repository.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job inconnu")
+        user = current_beta_user(request)
+        if beta_authenticator.enabled and (
+            user is None or job.get("owner_id") != user.username
+        ):
+            raise HTTPException(status_code=404, detail="Job inconnu")
+        return job
+
+    def safe_next_path(value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme or parsed.netloc or not value.startswith("/"):
+            return "/"
+        return value
+
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page(
+        request: Request,
+        next: str = "/",
+        error: str | None = None,
+    ) -> Response:
+        if not beta_authenticator.enabled:
+            return RedirectResponse("/", status_code=303)
+        if current_beta_user(request) is not None:
+            return RedirectResponse(safe_next_path(next), status_code=303)
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "login.html",
+            {"next_path": safe_next_path(next), "login_error": bool(error)},
+        )
+
+    @app.post("/login")
+    def login(
+        request: Request,
+        username: str = Form(min_length=1, max_length=80),
+        password: str = Form(min_length=1, max_length=200),
+        next: str = Form(default="/"),
+    ) -> Response:
+        if not beta_authenticator.enabled:
+            return RedirectResponse("/", status_code=303)
+        user = beta_authenticator.authenticate(username, password)
+        if user is None:
+            return RedirectResponse(
+                f"/login?error=1&next={quote(safe_next_path(next), safe='')}",
+                status_code=303,
+                headers={"Cache-Control": "no-store"},
+            )
+        response = RedirectResponse(safe_next_path(next), status_code=303)
+        response.set_cookie(
+            beta_authenticator.cookie_name,
+            beta_authenticator.create_session(user),
+            max_age=beta_authenticator.session_seconds,
+            httponly=True,
+            secure=request.url.scheme == "https",
+            samesite="lax",
+            path="/",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/logout")
+    def logout() -> Response:
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(beta_authenticator.cookie_name, path="/")
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/legal/mentions", response_class=HTMLResponse)
+    def legal_mentions(request: Request) -> HTMLResponse:
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "legal_mentions.html",
+            {
+                "publisher": resolved_settings.web_legal_publisher,
+                "contact_email": resolved_settings.web_contact_email,
+                "beta_user": current_beta_user(request),
+            },
+        )
+
+    @app.get("/legal/privacy", response_class=HTMLResponse)
+    def legal_privacy(request: Request) -> HTMLResponse:
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "legal_privacy.html",
+            {
+                "publisher": resolved_settings.web_legal_publisher,
+                "contact_email": resolved_settings.web_contact_email,
+                "beta_user": current_beta_user(request),
+            },
+        )
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -312,18 +478,44 @@ def create_app(
         }
 
     @app.post("/api/searches", response_model=SearchCreateResponse)
-    def create_search(payload: SearchCreateRequest) -> SearchCreateResponse:
+    def create_search(
+        payload: SearchCreateRequest,
+        request: Request,
+    ) -> SearchCreateResponse:
         if payload.date_from > payload.date_to:
             raise HTTPException(
                 status_code=422,
                 detail="date_from doit être inférieur ou égal à date_to",
             )
-        job_id = resolved_job_manager.submit(
-            _request_from_schema(
-                payload,
-                max_candidates=resolved_settings.web_max_candidates,
-            )
+        search_request = _request_from_schema(
+            payload,
+            max_candidates=resolved_settings.web_max_candidates,
         )
+        user = current_beta_user(request)
+        if beta_authenticator.enabled:
+            assert user is not None
+            cutoff = (datetime.now(UTC) - timedelta(days=1)).isoformat(
+                timespec="seconds"
+            )
+            used = resolved_repository.count_jobs_for_owner_since(
+                user.username, cutoff
+            )
+            if used >= resolved_settings.web_beta_daily_search_limit:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "Quota bêta atteint : "
+                        f"{resolved_settings.web_beta_daily_search_limit} "
+                        "recherches sur 24 heures."
+                    ),
+                    headers={"Retry-After": "3600"},
+                )
+            job_id = resolved_job_manager.submit(
+                search_request,
+                owner_id=user.username,
+            )
+        else:
+            job_id = resolved_job_manager.submit(search_request)
         return SearchCreateResponse(
             job_id=job_id,
             status_url=f"/api/searches/{job_id}",
@@ -331,7 +523,8 @@ def create_app(
         )
 
     @app.get("/api/searches/{job_id}", response_model=SearchStatusResponse)
-    def get_search_status(job_id: str) -> SearchStatusResponse:
+    def get_search_status(request: Request, job_id: str) -> SearchStatusResponse:
+        ensure_job_access(request, job_id)
         status = resolved_job_manager.get_status(job_id)
         if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
@@ -339,6 +532,7 @@ def create_app(
 
     @app.get("/api/searches/{job_id}/results", response_model=SearchResultsResponse)
     def get_search_results(
+        request: Request,
         job_id: str,
         document_type: str | None = None,
         market: str | None = None,
@@ -348,8 +542,7 @@ def create_app(
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=50, ge=1, le=200),
     ) -> SearchResultsResponse:
-        if resolved_job_manager.get_status(job_id) is None:
-            raise HTTPException(status_code=404, detail="Job inconnu")
+        ensure_job_access(request, job_id)
         results, total = resolved_repository.list_results(
             job_id,
             document_type=document_type,
@@ -370,6 +563,7 @@ def create_app(
 
     @app.get("/api/searches/{job_id}/export")
     def export_search_results(
+        request: Request,
         job_id: str,
         format: str = Query(default="csv", pattern="^(csv|json)$"),
         document_type: str | None = None,
@@ -377,8 +571,7 @@ def create_app(
         q: str | None = None,
         issuer_isin: str | None = None,
     ) -> FileResponse:
-        if resolved_job_manager.get_status(job_id) is None:
-            raise HTTPException(status_code=404, detail="Job inconnu")
+        ensure_job_access(request, job_id)
         results: list[dict[str, object]] = []
         page = 1
         while True:
@@ -415,8 +608,34 @@ def create_app(
         )
 
     @app.post("/api/searches/{job_id}/cancel")
-    def cancel_search(job_id: str) -> dict[str, bool]:
+    def cancel_search(request: Request, job_id: str) -> dict[str, bool]:
+        ensure_job_access(request, job_id)
         return {"cancelled": resolved_job_manager.cancel(job_id)}
+
+    @app.post(
+        "/api/feedback",
+        response_model=BetaFeedbackResponse,
+        status_code=201,
+    )
+    def create_feedback(
+        payload: BetaFeedbackRequest,
+        request: Request,
+    ) -> BetaFeedbackResponse:
+        user = current_beta_user(request)
+        if user is None:
+            raise HTTPException(status_code=401, detail="Session requise")
+        if payload.job_id:
+            ensure_job_access(request, payload.job_id)
+        feedback_id = uuid.uuid4().hex
+        resolved_repository.add_feedback(
+            feedback_id=feedback_id,
+            owner_id=user.username,
+            category=payload.category,
+            message=payload.message.strip(),
+            job_id=payload.job_id,
+            created_at=utc_now(),
+        )
+        return BetaFeedbackResponse(feedback_id=feedback_id)
 
     @app.get("/", response_class=HTMLResponse)
     def search_page(request: Request) -> HTMLResponse:
@@ -470,17 +689,31 @@ def create_app(
         # Sort by city (alphabetical), then by market name
         markets_list.sort(key=lambda m: (m["city"].casefold(), m["name"].casefold()))
         
+        user = current_beta_user(request)
+        quota_used = 0
+        if user is not None:
+            cutoff = (datetime.now(UTC) - timedelta(days=1)).isoformat(
+                timespec="seconds"
+            )
+            quota_used = resolved_repository.count_jobs_for_owner_since(
+                user.username, cutoff
+            )
         return _TEMPLATES.TemplateResponse(
             request,
             "search.html",
             {
                 "markets": markets_list,
                 "document_types": DOCUMENT_TYPES,
+                "beta_user": user,
+                "quota_used": quota_used,
+                "quota_limit": resolved_settings.web_beta_daily_search_limit,
+                "beta_enabled": beta_authenticator.enabled,
             },
         )
 
     @app.get("/searches/{job_id}", response_class=HTMLResponse)
     def results_page(request: Request, job_id: str) -> HTMLResponse:
+        ensure_job_access(request, job_id)
         status = resolved_job_manager.get_status(job_id)
         if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
@@ -489,6 +722,8 @@ def create_app(
             "status": _public_search_status(status),
             "document_types": DOCUMENT_TYPES,
             "show_initial_results": False,
+            "beta_user": current_beta_user(request),
+            "beta_enabled": beta_authenticator.enabled,
         }
         if status["status"] in {"done", "partial", "failed"}:
             results, total = resolved_repository.list_results(
@@ -518,6 +753,7 @@ def create_app(
 
     @app.get("/partials/searches/{job_id}/status", response_class=HTMLResponse)
     def job_status_partial(request: Request, job_id: str) -> HTMLResponse:
+        ensure_job_access(request, job_id)
         status = resolved_job_manager.get_status(job_id)
         if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
@@ -539,6 +775,7 @@ def create_app(
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=50, ge=1, le=200),
     ) -> HTMLResponse:
+        ensure_job_access(request, job_id)
         status = resolved_job_manager.get_status(job_id)
         if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")

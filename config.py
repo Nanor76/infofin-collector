@@ -218,6 +218,13 @@ class Settings:
     firestore_collection_prefix: str = "infofin_web"
     web_access_username: str = "infofin"
     web_access_password: str = ""
+    web_beta_users_json: str = ""
+    web_beta_session_secret: str = ""
+    web_beta_session_hours: int = 168
+    web_beta_daily_search_limit: int = 3
+    web_worker_token: str = ""
+    web_contact_email: str = ""
+    web_legal_publisher: str = "InfoFin"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -718,4 +725,19 @@ class Settings:
             web_access_password=os.getenv(
                 "INFOFIN_WEB_ACCESS_PASSWORD", ""
             ),
+            web_beta_users_json=os.getenv("INFOFIN_BETA_USERS_JSON", ""),
+            web_beta_session_secret=os.getenv(
+                "INFOFIN_BETA_SESSION_SECRET", ""
+            ),
+            web_beta_session_hours=max(
+                1, _env_int("INFOFIN_BETA_SESSION_HOURS", 168)
+            ),
+            web_beta_daily_search_limit=max(
+                1, _env_int("INFOFIN_BETA_DAILY_SEARCH_LIMIT", 3)
+            ),
+            web_worker_token=os.getenv("INFOFIN_WORKER_TOKEN", ""),
+            web_contact_email=os.getenv("INFOFIN_CONTACT_EMAIL", "").strip(),
+            web_legal_publisher=os.getenv(
+                "INFOFIN_LEGAL_PUBLISHER", "InfoFin"
+            ).strip(),
         )

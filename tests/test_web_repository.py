@@ -56,6 +56,7 @@ def test_initialize_web_search_schema(tmp_path: Path) -> None:
     assert "web_search_jobs" in tables
     assert "web_search_market_runs" in tables
     assert "web_search_results" in tables
+    assert "web_beta_feedback" in tables
 
 
 def test_create_and_get_job(tmp_path: Path) -> None:
@@ -79,6 +80,37 @@ def test_create_and_get_job(tmp_path: Path) -> None:
     assert job["warnings"] == ["warn"]
     assert job["errors"] == ["err"]
     assert job["request"].markets == ("Euronext Paris",)
+
+
+def test_owner_quota_and_feedback_are_persisted(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    request = LinkSearchRequest(
+        markets=("Euronext Paris",),
+        date_from=date(2026, 6, 1),
+        date_to=date(2026, 6, 30),
+    )
+    repo.create_job("job-owned", request, owner_id="alice")
+    repo.add_feedback(
+        feedback_id="feedback-1",
+        owner_id="alice",
+        category="usability",
+        message="Très utile.",
+        job_id="job-owned",
+        created_at="2026-07-18T12:00:00+00:00",
+    )
+
+    assert repo.get_job("job-owned")["owner_id"] == "alice"
+    assert repo.count_jobs_for_owner_since(
+        "alice", "2000-01-01T00:00:00+00:00"
+    ) == 1
+    assert repo.count_jobs_for_owner_since(
+        "bob", "2000-01-01T00:00:00+00:00"
+    ) == 0
+    with repo.database.connect() as connection:
+        feedback = connection.execute(
+            "SELECT owner_id, category FROM web_beta_feedback"
+        ).fetchone()
+    assert tuple(feedback) == ("alice", "usability")
 
 
 def test_replace_results_and_list_paginated(tmp_path: Path) -> None:

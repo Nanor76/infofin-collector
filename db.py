@@ -3111,6 +3111,7 @@ class Database:
         schema = """
         CREATE TABLE IF NOT EXISTS web_search_jobs (
             id TEXT PRIMARY KEY,
+            owner_id TEXT,
             created_at TEXT NOT NULL,
             started_at TEXT,
             finished_at TEXT,
@@ -3168,6 +3169,32 @@ class Database:
             ON web_search_results(market);
         CREATE INDEX IF NOT EXISTS idx_web_search_results_url
             ON web_search_results(url);
+
+        CREATE TABLE IF NOT EXISTS web_beta_feedback (
+            id TEXT PRIMARY KEY,
+            owner_id TEXT NOT NULL,
+            job_id TEXT REFERENCES web_search_jobs(id) ON DELETE SET NULL,
+            category TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_web_beta_feedback_owner_created
+            ON web_beta_feedback(owner_id, created_at);
         """
         with self.connect() as connection:
             connection.executescript(schema)
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(web_search_jobs)"
+                ).fetchall()
+            }
+            if "owner_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE web_search_jobs ADD COLUMN owner_id TEXT"
+                )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_web_search_jobs_owner_created "
+                "ON web_search_jobs(owner_id, created_at)"
+            )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import date
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient
 from config import Settings
 from db import Database
 from webapp.app import create_app
+from webapp.beta_access import hash_password
 from webapp.jobs import JobManager
 from webapp.repositories import WebSearchRepository
 from webapp.services.document_search import (
@@ -382,6 +384,111 @@ def test_password_protects_every_web_route(client: TestClient) -> None:
     assert authenticated.status_code == 200
     assert authenticated.json()["status"] == "ok"
     assert static_asset.status_code == 200
+
+
+def test_beta_pages_keep_stable_interactive_test_ids(
+    client: TestClient,
+) -> None:
+    password = "alice secure password"
+    settings = replace(
+        client.app.state.settings,
+        web_beta_users_json=json.dumps(
+            {
+                "alice": {
+                    "display_name": "Alice",
+                    "password_hash": hash_password(
+                        password,
+                        salt=b"0123456789abcdef",
+                        iterations=1_000,
+                    ),
+                }
+            }
+        ),
+        web_beta_session_secret="s" * 32,
+        web_contact_email="beta@example.test",
+    )
+    owned_job_id = "ownedjob1234567890abcdef1234567890a"
+    client.app.state.repository.create_job(
+        owned_job_id,
+        LinkSearchRequest(
+            markets=("Euronext Paris",),
+            date_from=date(2026, 6, 1),
+            date_to=date(2026, 6, 30),
+        ),
+        owner_id="alice",
+    )
+    client.app.state.repository.finish_job(
+        owned_job_id,
+        status="done",
+        results_count=0,
+        warnings=(),
+        errors=(),
+    )
+    app = create_app(
+        settings=settings,
+        database=client.app.state.database,
+        repository=client.app.state.repository,
+        job_manager=client.app.state.job_manager,
+    )
+
+    with TestClient(app) as beta_client:
+        login = beta_client.get("/login")
+        beta_client.post(
+            "/login",
+            data={
+                "username": "alice",
+                "password": password,
+                "next": "/",
+            },
+        )
+        home = beta_client.get("/")
+        results = beta_client.get(f"/searches/{owned_job_id}")
+        mentions = beta_client.get("/legal/mentions")
+        privacy = beta_client.get("/legal/privacy")
+
+    for response in (login, home, results, mentions, privacy):
+        soup = BeautifulSoup(response.text, "html.parser")
+        assert not _interactive_elements_without_test_id(soup)
+
+    _assert_test_ids(
+        BeautifulSoup(login.text, "html.parser"),
+        {
+            "login-page",
+            "login-heading",
+            "login-form",
+            "login-username-input",
+            "login-password-input",
+            "login-submit-button",
+            "layout-legal-mentions-link",
+            "layout-legal-privacy-link",
+        },
+    )
+    _assert_test_ids(
+        BeautifulSoup(home.text, "html.parser"),
+        {
+            "layout-beta-account",
+            "layout-beta-user",
+            "layout-logout-form",
+            "layout-logout-button",
+            "search-beta-quota-state",
+            "search-beta-quota-used-value",
+            "search-beta-quota-limit-value",
+        },
+    )
+    _assert_test_ids(
+        BeautifulSoup(results.text, "html.parser"),
+        {
+            "results-feedback-section",
+            "results-feedback-form",
+            "results-feedback-category-select",
+            "results-feedback-message-input",
+            "results-feedback-submit-button",
+            "results-feedback-response-state",
+        },
+    )
+    assert 'fetch("/api/feedback"' in (
+        Path(__file__).parents[1] / "webapp" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
 
 
 def test_get_home_contains_form(client: TestClient) -> None:

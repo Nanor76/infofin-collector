@@ -165,20 +165,66 @@ class WebSearchRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
-    def create_job(self, job_id: str, request: LinkSearchRequest) -> None:
+    def create_job(
+        self,
+        job_id: str,
+        request: LinkSearchRequest,
+        owner_id: str | None = None,
+    ) -> None:
         with self.database.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO web_search_jobs(
-                    id, created_at, status, request_json, markets_count
+                    id, owner_id, created_at, status, request_json, markets_count
                 )
-                VALUES (?, ?, 'queued', ?, ?)
+                VALUES (?, ?, ?, 'queued', ?, ?)
                 """,
                 (
                     job_id,
+                    owner_id,
                     utc_now(),
                     _request_to_json(request),
                     len(request.markets),
+                ),
+            )
+
+    def count_jobs_for_owner_since(self, owner_id: str, cutoff_iso: str) -> int:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM web_search_jobs
+                WHERE owner_id = ? AND created_at >= ?
+                """,
+                (owner_id, cutoff_iso),
+            ).fetchone()
+        return int(row["cnt"] if row else 0)
+
+    def add_feedback(
+        self,
+        *,
+        feedback_id: str,
+        owner_id: str,
+        category: str,
+        message: str,
+        job_id: str | None,
+        created_at: str,
+    ) -> None:
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO web_beta_feedback(
+                    id, owner_id, job_id, category, message, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    feedback_id,
+                    owner_id,
+                    job_id,
+                    category,
+                    message,
+                    created_at,
                 ),
             )
 
@@ -519,6 +565,14 @@ class WebSearchRepository:
                 DELETE FROM web_search_jobs
                 WHERE created_at < ?
                 """,
+                (cutoff_iso,),
+            )
+            return cursor.rowcount
+
+    def purge_feedback_older_than(self, cutoff_iso: str) -> int:
+        with self.database.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM web_beta_feedback WHERE created_at < ?",
                 (cutoff_iso,),
             )
             return cursor.rowcount

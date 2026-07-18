@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block title %}Mentions légales — InfoFin{% endblock %}
+{% block content %}
+<article class="legal-card" data-testid="legal-mentions-page">
+  <h1 data-testid="legal-mentions-heading">Mentions légales</h1>
+  <h2>Éditeur</h2>
+  <p>{{ publisher }} — service expérimental en bêta privée.</p>
+  {% if contact_email %}
+  <p>Contact : <a href="mailto:{{ contact_email }}" data-testid="legal-contact-email-link">{{ contact_email }}</a></p>
+  {% else %}
+  <p>Le contact de l’éditeur figure dans l’invitation transmise aux bêta-testeurs.</p>
+  {% endif %}
+  <h2>Hébergement</h2>
+  <p>Google Cloud Platform, Google Cloud EMEA Limited, Gordon House, Barrow Street, Dublin 4, Irlande.</p>
+  <h2>Nature du service</h2>
+  <p>InfoFin facilite l’accès à des documents publiés par des sources officielles. Il ne fournit ni recommandation, ni conseil en investissement. L’exhaustivité et l’exactitude doivent être vérifiées auprès de la source officielle.</p>
+</article>
+{% endblock %}

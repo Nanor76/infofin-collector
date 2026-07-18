@@ -32,6 +32,7 @@ def _status_from_repository(repository, job_id: str) -> dict[str, object] | None
         results_count = repository.count_results(job_id)
     return {
         "job_id": job_id,
+        "owner_id": job.get("owner_id"),
         "status": job["status"],
         "results_count": results_count,
         "warnings": job["warnings"],
@@ -143,9 +144,13 @@ class JobManager:
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._futures: dict[str, Future[None]] = {}
 
-    def submit(self, request: LinkSearchRequest) -> str:
+    def submit(
+        self,
+        request: LinkSearchRequest,
+        owner_id: str | None = None,
+    ) -> str:
         job_id = uuid.uuid4().hex
-        self.repository.create_job(job_id, request)
+        self.repository.create_job(job_id, request, owner_id=owner_id)
         future = self._executor.submit(self._run_job, job_id, request)
         self._futures[job_id] = future
         return job_id
@@ -190,9 +195,13 @@ class CloudJobManager:
         self.repository = repository
         self.launcher = launcher
 
-    def submit(self, request: LinkSearchRequest) -> str:
+    def submit(
+        self,
+        request: LinkSearchRequest,
+        owner_id: str | None = None,
+    ) -> str:
         job_id = uuid.uuid4().hex
-        self.repository.create_job(job_id, request)
+        self.repository.create_job(job_id, request, owner_id=owner_id)
         try:
             self.launcher.launch(job_id)
         except Exception:

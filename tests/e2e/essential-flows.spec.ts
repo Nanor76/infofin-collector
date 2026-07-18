@@ -158,10 +158,39 @@ test("l'état technique queued est affiché comme une recherche en cours", async
 
   const worker = await page.request.post("/internal/search-worker", {
     data: { job_id: search.job_id },
+    headers: { "X-InfoFin-Worker-Token": "e2e-worker-token-32-characters!!!!" },
   });
   expect(worker.status()).toBe(204);
   await expect(page.getByTestId("results-job-state")).toHaveText("Terminée");
   await expect(page.getByTestId("results-job-indexed-count")).toHaveText("51");
+});
+
+test("la bêta attribue le quota et le retour au compte connecté", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("layout-beta-user")).toHaveText("Testeur E2E");
+  await expect(page.getByTestId("search-beta-quota-state")).toBeVisible();
+
+  const search = await createFixtureSearch(page);
+  await page.goto(`/searches/${search.job_id}`);
+  await page.getByTestId("results-feedback-category-select").selectOption("usability");
+  await page
+    .getByTestId("results-feedback-message-input")
+    .fill("La navigation mobile est claire.");
+  const feedbackRequest = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/feedback") && request.method() === "POST",
+  );
+  await page.getByTestId("results-feedback-submit-button").click();
+  expect((await feedbackRequest).postDataJSON()).toEqual({
+    category: "usability",
+    message: "La navigation mobile est claire.",
+    job_id: search.job_id,
+  });
+  await expect(page.getByTestId("results-feedback-response-state")).toHaveText(
+    "Merci, votre retour a bien été enregistré.",
+  );
 });
 
 test("une recherche par type exclut les autres périodicités", async ({
