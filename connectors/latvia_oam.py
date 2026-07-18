@@ -66,6 +66,8 @@ NEGATIVE_TERMS = (
     "dividendes",
     "finansu kalendars",
     "prezentacija",
+    "announces the date of publication",
+    "date of publication of the financial report",
 )
 
 

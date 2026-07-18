@@ -115,6 +115,7 @@ def test_dfsa_json_html_and_detail_parsing() -> None:
         ("Årsregnskab 2025", "annual_financial_report"),
         ("Årsregnskabsmeddelelse 2025", "year_end_report"),
         ("Halvårsrapport 2026", "half_year_financial_report"),
+        ("Tryg A/S – interim report Q2 and H1 2026", "half_year_financial_report"),
         ("Delårsrapport for 2. kvartal 2025/26 - halvår", "half_year_financial_report"),
         ("Delårsrapport Q1 2026", "interim_report"),
         ("Kvartalsrapport Q1 2026", "quarterly_report"),

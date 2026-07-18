@@ -20,6 +20,17 @@ async function createFixtureSearch(
 test("la recherche permet de sélectionner les critères et affiche les résultats", async ({
   page,
 }) => {
+  const baseURL = test.info().project.use.baseURL as string;
+  const unauthenticatedHealth = await fetch(`${baseURL}/api/health`);
+  expect(unauthenticatedHealth.status).toBe(401);
+
+  const health = await page.request.get("/api/health");
+  expect(await health.json()).toEqual({
+    status: "ok",
+    storage_backend: "firestore",
+    job_backend: "cloud-tasks",
+  });
+
   await page.goto("/");
 
   await expect(page.getByTestId("search-heading")).toBeVisible();
@@ -122,6 +133,64 @@ test("la sélection rapide, la carte et la validation restent synchronisées", a
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("l'état technique queued est affiché comme une recherche en cours", async ({
+  page,
+}) => {
+  const response = await page.request.post("/api/searches", {
+    data: {
+      markets: ["Euronext Paris"],
+      date_from: "2026-06-01",
+      date_to: "2026-06-30",
+      query: "queued-fixture",
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  const search = (await response.json()) as { job_id: string };
+
+  await page.goto(`/searches/${search.job_id}`);
+
+  await expect(page.getByTestId("results-job-status")).toHaveAttribute(
+    "data-status",
+    "running",
+  );
+  await expect(page.getByTestId("results-job-state")).toHaveText("En cours");
+  await expect(page.locator("body")).not.toContainText("queued");
+
+  const worker = await page.request.post("/internal/search-worker", {
+    data: { job_id: search.job_id },
+  });
+  expect(worker.status()).toBe(204);
+  await expect(page.getByTestId("results-job-state")).toHaveText("Terminée");
+  await expect(page.getByTestId("results-job-indexed-count")).toHaveText("51");
+});
+
+test("une recherche par type exclut les autres périodicités", async ({
+  page,
+}) => {
+  const search = await createFixtureSearch(page, {
+    documentTypes: ["annual_financial_report"],
+  });
+  await page.goto(`/searches/${search.job_id}`);
+
+  await expect(page.getByTestId("results-total-count")).toHaveText("51");
+  await expect(page.getByTestId("results-document-row")).toHaveCount(50);
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Annuel" }),
+  ).toHaveCount(50);
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Semestriel" }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .getByTestId("results-document-type")
+      .filter({ hasText: "Rapport Trimestriel" }),
+  ).toHaveCount(0);
+});
+
 test("les filtres HTMX couvrent le type, le texte et l'état vide", async ({
   page,
 }) => {
@@ -144,6 +213,7 @@ test("les filtres HTMX couvrent le type, le texte et l'état vide", async ({
   await page
     .getByTestId("results-filter-document-type-select")
     .selectOption("");
+  await expect(page.getByTestId("results-total-count")).toHaveText("51");
   await page.getByTestId("results-filter-query-input").fill("introuvable");
   await expect(page.getByTestId("results-total-count")).toHaveText("0");
   await expect(page.getByTestId("results-empty-state")).toBeVisible();
@@ -182,6 +252,32 @@ test("le tri, la pagination et l'export CSV sont opérationnels", async ({
   expect(csv).toContain("market,published_at,period_end_date");
   expect(csv).not.toContain("source");
   expect(csv).toContain("Beta ASA");
+});
+
+test("le tableau mobile conserve son défilement horizontal après la fin de la recherche", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const search = await createFixtureSearch(page);
+  await page.goto(`/searches/${search.job_id}`);
+  await page.waitForLoadState("networkidle");
+
+  const scrollContainer = page.getByTestId("results-table-scroll-container");
+  await expect(scrollContainer).toBeVisible();
+  const initialPosition = await scrollContainer.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+    return element.scrollLeft;
+  });
+  expect(initialPosition).toBeGreaterThan(0);
+
+  await page.clock.fastForward(5_000);
+  await page.waitForLoadState("networkidle");
+
+  await expect(scrollContainer).toHaveJSProperty("scrollLeft", initialPosition);
+  await expect(
+    page.getByTestId("results-document-open-link").first(),
+  ).toBeVisible();
 });
 
 test("les métadonnées techniques restent masquées et les documents s'ouvrent à leur adresse officielle", async ({

@@ -1026,6 +1026,24 @@ erreur est `success`; une erreur globale d'initialisation produit `failed`.
 Les commandes, les tests d'integration live et les conventions Playwright sont
 regroupes dans [`TESTING.md`](TESTING.md).
 
+## Déploiement Google Cloud
+
+La webapp peut être déployée sur Cloud Run avec Firestore. Le mode performance
+utilise Cloud Tasks pour exécuter les recherches dans le service déjà chaud et
+éviter le démarrage à froid des Cloud Run Jobs, tout en conservant SQLite pour
+le développement local. Le script configure une instance maximale, une
+rétention de 30 jours et une purge quotidienne :
+
+```powershell
+.\deploy\google-cloud.ps1 -ProjectId "mon-projet-google"
+```
+
+Le mode worker chaud s'active avec `-Performance -WarmWorker` et la protection
+HTTP documentée dans [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md).
+
+Voir [`GOOGLE_CLOUD.md`](GOOGLE_CLOUD.md) pour les prérequis, l'architecture,
+les permissions, la vérification et les limites de coût.
+
 ## Spain source discovery / troubleshooting
 
 Le connecteur espagnol interroge les registres officiels de la CNMV (Comisión Nacional del Mercado de Valores) pour récupérer les rapports financiers annuels et semestriels. Il interroge optionnellement la liste des entreprises cotées de la BME (Bolsas y Mercados Españoles) pour enrichir la watchlist et mapper les URLs des sociétés.
@@ -1133,3 +1151,31 @@ Le Danemark est marqué `eu_candidate` pour le contrôle géographique PEA. Cela
 vaut jamais confirmation d'éligibilité : le domicile doit être confirmé depuis
 les données émetteur DFSA et aucun `pea_eligible=true` n'est déduit de la place
 de cotation.
+
+## Bulgaria source discovery / troubleshooting
+
+Le connecteur bulgare interroge d'abord le portail X3News courant avec les
+filtres officiels de date et de catégorie financière. Il ouvre ensuite les
+pièces jointes des seules périodicités demandées et conserve l'archive Apache
+de la Bourse de Sofia comme repli historique.
+
+Les variables disponibles sont :
+
+* `BULGARIA_X3NEWS_BASE_URL`
+* `BULGARIA_X3NEWS_VERIFY_SSL`
+* `BULGARIA_X3NEWS_MAX_PAGES`
+* `BULGARIA_BSE_X3NEWS_BASE_URL`
+* `BULGARIA_BSE_X3NEWS_LOOKBACK_DAYS`
+* `BULGARIA_BSE_X3NEWS_MAX_CANDIDATES_PER_SOURCE`
+
+Le serveur X3News présente actuellement une chaîne de certificats que
+`requests` ne valide pas dans l'environnement de référence. La vérification
+est donc désactivée uniquement pour ce portail par défaut et un avertissement
+explicite est journalisé. Réactiver `BULGARIA_X3NEWS_VERIFY_SSL=true` dès que la
+chaîne TLS est corrigée ou qu'un magasin de certificats adapté est disponible.
+
+```powershell
+python main.py diagnose-source bulgaria
+python main.py discover-market-documents --market "Bulgarian Stock Exchange" --date-from 2025-07-14 --date-to 2026-07-14 --format json
+python main.py watch --market "Bulgarian Stock Exchange" --limit 10 --dry-run
+```

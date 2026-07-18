@@ -4,23 +4,30 @@ import hashlib
 import re
 import time
 import unicodedata
+import warnings
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from html import unescape
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import urljoin, unquote, urlparse
+from urllib.parse import parse_qs, urljoin, unquote, urlparse
 
 import requests
+from bs4 import BeautifulSoup
+from urllib3.exceptions import InsecureRequestWarning
 
 from connectors.base import Connector, ConnectorState, DocumentCandidate, EndpointAttempt
 from models import Issuer
 
 
 DEFAULT_BASE_URL = "https://download.bse-sofia.bg"
+DEFAULT_PORTAL_BASE_URL = "https://www.x3news.com"
 COMPANIES_PATH = "/x3news_companies/"
 SUPPORTED_FORMATS = {"pdf", "zip"}
 DISCOVER_FALLBACK_ISSUER_QUERIES = ("Тибиш", "Интерсолар", "DKJ")
+PORTAL_SOURCE_NAME = "bulgaria_x3news"
+PORTAL_RESULTS_PER_PAGE = 11
 
 PERIODIC_BUCKET_MARKERS = (
     "finansovi otche",
@@ -357,6 +364,26 @@ class BulgariaFiling:
 
 
 @dataclass(frozen=True, slots=True)
+class BulgariaPortalNotice:
+    extri_id: str
+    issuer_name: str
+    category: str
+    published_at: date
+    document_type: str
+    detail_url: str
+    period_end_date: date | None
+    reporting_year: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class BulgariaPortalAttachment:
+    attachment_id: str
+    title: str
+    download_url: str
+    file_format: str
+
+
+@dataclass(frozen=True, slots=True)
 class BulgariaSourceDiagnostic:
     source: str
     state: ConnectorState
@@ -384,6 +411,185 @@ class BulgariaSourceDiscovery:
     candidates: tuple[DocumentCandidate, ...]
     attempts: tuple[EndpointAttempt, ...]
     error: str | None = None
+
+
+def classify_x3news_category(category: str) -> str:
+    normalized = _normalize(category)
+    if any(
+        marker in normalized
+        for marker in (
+            "polugodishen",
+            "полугодишен",
+            "half year",
+            "half yearly",
+            "semi annual",
+        )
+    ):
+        return "half_year_financial_report"
+    if any(
+        marker in normalized
+        for marker in ("godishen", "годишен", "annual")
+    ):
+        return "annual_financial_report"
+    if any(
+        marker in normalized
+        for marker in ("trimes", "тримес", "quarter")
+    ):
+        return "quarterly_financial_report"
+    return "financial_report"
+
+
+def _x3news_period_info(
+    category: str,
+    document_type: str,
+) -> tuple[date | None, int | None]:
+    normalized = _normalize(category)
+    years = [int(value) for value in re.findall(r"(?<!\d)(20\d{2})(?!\d)", normalized)]
+    reporting_year = years[-1] if years else None
+    if reporting_year is None:
+        return None, None
+    if document_type == "annual_financial_report":
+        return date(reporting_year, 12, 31), reporting_year
+    if document_type == "half_year_financial_report":
+        return date(reporting_year, 6, 30), reporting_year
+    if document_type != "quarterly_financial_report":
+        return None, reporting_year
+    quarter_month = None
+    quarter_markers = (
+        (("first quarter", "parvo trimesechie", "първо тримесечие", "q1"), 3),
+        (("second quarter", "vtoro trimesechie", "второ тримесечие", "q2"), 6),
+        (("third quarter", "treto trimesechie", "трето тримесечие", "q3"), 9),
+        (("fourth quarter", "chetvarto trimesechie", "четвърто тримесечие", "q4"), 12),
+    )
+    for markers, month in quarter_markers:
+        if any(marker in normalized for marker in markers):
+            quarter_month = month
+            break
+    if quarter_month is None:
+        return None, reporting_year
+    day = 31 if quarter_month in {3, 12} else 30
+    return date(reporting_year, quarter_month, day), reporting_year
+
+
+def parse_x3news_listing(
+    html: str,
+    *,
+    base_url: str = DEFAULT_PORTAL_BASE_URL,
+) -> tuple[list[BulgariaPortalNotice], int]:
+    soup = BeautifulSoup(html, "html.parser")
+    notices: list[BulgariaPortalNotice] = []
+    for row in soup.select(".news-row"):
+        link = row.select_one('a[href*="showNews"]')
+        issuer = row.select_one("b")
+        category_node = row.select_one(".newsHeaderLink")
+        if link is None or issuer is None or category_node is None:
+            continue
+        match = re.search(
+            r"showNews\(\s*'[^']+'\s*,\s*(\d+)\s*\)",
+            str(link.get("href") or ""),
+        )
+        if match is None:
+            continue
+        published_at = None
+        for node in row.select("span"):
+            raw_date = node.get_text(" ", strip=True)
+            try:
+                published_at = datetime.strptime(
+                    raw_date,
+                    "%d-%m-%Y %H:%M",
+                ).date()
+                break
+            except ValueError:
+                continue
+        if published_at is None:
+            continue
+        category = category_node.get_text(" ", strip=True)
+        document_type = classify_x3news_category(category)
+        period_end_date, reporting_year = _x3news_period_info(
+            category,
+            document_type,
+        )
+        extri_id = match.group(1)
+        notices.append(
+            BulgariaPortalNotice(
+                extri_id=extri_id,
+                issuer_name=issuer.get_text(" ", strip=True),
+                category=category,
+                published_at=published_at,
+                document_type=document_type,
+                detail_url=(
+                    f"{base_url.rstrip('/')}/displayNovina.jsp?formid={extri_id}"
+                ),
+                period_end_date=period_end_date,
+                reporting_year=reporting_year,
+            )
+        )
+    page_count = 1
+    page_match = re.search(
+        r"(?:Page|Страница)\s*:\s*\(\s*\d+\s+(?:of|от)\s+(\d+)\s*\)",
+        soup.get_text(" ", strip=True),
+        re.IGNORECASE,
+    )
+    if page_match:
+        page_count = max(1, int(page_match.group(1)))
+    return notices, page_count
+
+
+def _x3news_attachment_format(title: str) -> str:
+    normalized = _normalize(title)
+    if "esef" in normalized or "zip" in normalized:
+        return "zip"
+    if "xhtml" in normalized:
+        return "xhtml"
+    if "xml" in normalized:
+        return "xml"
+    if "excel" in normalized or "xlsx" in normalized or " xls " in f" {normalized} ":
+        return "xlsx"
+    if "pdf" in normalized:
+        return "pdf"
+    return ""
+
+
+def parse_x3news_attachments(
+    html: str,
+    *,
+    base_url: str = DEFAULT_PORTAL_BASE_URL,
+) -> list[BulgariaPortalAttachment]:
+    soup = BeautifulSoup(html, "html.parser")
+    attachments: list[BulgariaPortalAttachment] = []
+    for link in soup.select('a[href*="download.php"]'):
+        href = str(link.get("href") or "")
+        download_url = urljoin(f"{base_url.rstrip('/')}/", href)
+        attachment_ids = parse_qs(urlparse(download_url).query).get("id") or []
+        if not attachment_ids:
+            continue
+        title = link.get_text(" ", strip=True).rstrip(" *")
+        attachments.append(
+            BulgariaPortalAttachment(
+                attachment_id=str(attachment_ids[0]),
+                title=title,
+                download_url=download_url,
+                file_format=_x3news_attachment_format(title),
+            )
+        )
+    return attachments
+
+
+def extract_x3news_detail_period(
+    html: str,
+    document_type: str,
+) -> tuple[date | None, int | None]:
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+    match = re.search(r"(\d{2})[-./](\d{2})[-./](20\d{2})", text)
+    if match:
+        day, month, year = map(int, match.groups())
+        try:
+            period_end = date(year, month, day)
+        except ValueError:
+            period_end = None
+        if period_end is not None:
+            return period_end, period_end.year
+    return _x3news_period_info(text, document_type)
 
 
 def parse_apache_index(html: str) -> list[BulgariaIndexEntry]:
@@ -477,21 +683,27 @@ class BulgariaBseX3NewsConnector(Connector):
         *,
         session: requests.Session,
         base_url: str = DEFAULT_BASE_URL,
+        portal_base_url: str = DEFAULT_PORTAL_BASE_URL,
         rate_limit_seconds: float = 0.5,
         lookback_days: int = 365,
         timeout: int = 30,
         verify_ssl: bool = True,
+        portal_verify_ssl: bool = False,
+        portal_max_pages: int = 100,
         max_active_buckets: int = 3,
         max_issuer_scans: int = 30,
-        max_candidates_per_source: int = 40,
+        max_candidates_per_source: int = 200,
     ) -> None:
         self.session = session
         self.base_url = base_url.rstrip("/")
         self.companies_url = f"{self.base_url}{COMPANIES_PATH}"
+        self.portal_base_url = portal_base_url.rstrip("/")
         self.rate_limit_seconds = max(0.0, rate_limit_seconds)
         self.lookback_days = max(1, lookback_days)
         self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.portal_verify_ssl = portal_verify_ssl
+        self.portal_max_pages = max(1, portal_max_pages)
         self.max_active_buckets = max(1, max_active_buckets)
         self.max_issuer_scans = max(1, max_issuer_scans)
         self.max_candidates_per_source = max(1, max_candidates_per_source)
@@ -501,8 +713,12 @@ class BulgariaBseX3NewsConnector(Connector):
         self._last_request_at = 0.0
         self._index_cache: dict[str, list[BulgariaIndexEntry]] = {}
         self._filing_cache: dict[str, BulgariaFiling] = {}
+        self._portal_notice_cache: dict[str, BulgariaPortalNotice] = {}
+        self._portal_detail_cache: dict[str, tuple[DocumentCandidate, ...]] = {}
         self._scanned_notices = 0
         self._issuer_scans = 0
+        self._details_visited = 0
+        self._cache_hits = 0
 
     def _wait(self) -> None:
         remaining = self.rate_limit_seconds - (
@@ -552,6 +768,334 @@ class BulgariaBseX3NewsConnector(Connector):
                 )
             )
             raise
+        finally:
+            self._last_request_at = time.monotonic()
+
+    def _fetch_portal_text(
+        self,
+        *,
+        params: dict[str, object],
+        label: str,
+    ) -> str:
+        self._wait()
+        response: requests.Response | None = None
+        source_context = getattr(self.session, "source", None)
+        context = (
+            source_context(PORTAL_SOURCE_NAME)
+            if callable(source_context)
+            else nullcontext()
+        )
+        try:
+            with context, warnings.catch_warnings():
+                if not self.portal_verify_ssl:
+                    warnings.simplefilter("ignore", InsecureRequestWarning)
+                response = self.session.get(
+                    f"{self.portal_base_url}/",
+                    params=params,
+                    headers={"Accept": "text/html,application/xhtml+xml"},
+                    timeout=self.timeout,
+                    verify=self.portal_verify_ssl,
+                )
+            response.raise_for_status()
+            self.attempts.append(
+                EndpointAttempt(
+                    name=label,
+                    base_url=self.portal_base_url,
+                    dataset="x3news_current",
+                    endpoint=f"/?page={params.get('page', '')}",
+                    method="GET",
+                    http_status=response.status_code,
+                    success=True,
+                )
+            )
+            return response.text
+        except Exception as exc:
+            self.attempts.append(
+                EndpointAttempt(
+                    name=label,
+                    base_url=self.portal_base_url,
+                    dataset="x3news_current",
+                    endpoint=f"/?page={params.get('page', '')}",
+                    method="GET",
+                    http_status=getattr(response, "status_code", None),
+                    success=False,
+                    error=str(exc),
+                )
+            )
+            raise
+        finally:
+            self._last_request_at = time.monotonic()
+
+    def _collect_portal_notices(
+        self,
+        *,
+        since: date | None,
+        until: date | None,
+        document_types: tuple[str, ...] = (),
+        limit: int | None = None,
+    ) -> list[BulgariaPortalNotice]:
+        start = since or (date.today() - timedelta(days=self.lookback_days))
+        end = until or date.today()
+        requested_types = set(document_types)
+        effective_limit = max(1, limit or self.max_candidates_per_source)
+        notices: list[BulgariaPortalNotice] = []
+        seen_ids: set[str] = set()
+        page = 1
+        page_count = 1
+        while page <= min(page_count, self.portal_max_pages):
+            html = self._fetch_portal_text(
+                params={
+                    "language": "en",
+                    "page": "News",
+                    "START_DATE": start.strftime("%d-%m-%Y"),
+                    "END_DATE": end.strftime("%d-%m-%Y"),
+                    "MESSAGE_TYPE": "1",
+                    "current": str(page),
+                },
+                label=f"X3News financial reports page {page}",
+            )
+            parsed, detected_pages = parse_x3news_listing(
+                html,
+                base_url=self.portal_base_url,
+            )
+            page_count = max(page_count, detected_pages)
+            for notice in parsed:
+                if notice.extri_id in seen_ids:
+                    continue
+                seen_ids.add(notice.extri_id)
+                if notice.published_at < start or notice.published_at > end:
+                    continue
+                if requested_types and notice.document_type not in requested_types:
+                    continue
+                notices.append(notice)
+                self._portal_notice_cache[notice.extri_id] = notice
+                if len(notices) >= effective_limit:
+                    return notices
+            page += 1
+        return notices
+
+    def _portal_notice_candidate(
+        self,
+        notice: BulgariaPortalNotice,
+    ) -> DocumentCandidate:
+        aliases = {
+            notice.issuer_name,
+            _decode_display_name(notice.issuer_name),
+        }
+        return DocumentCandidate(
+            title=f"{notice.issuer_name} - {notice.category}",
+            url=notice.detail_url,
+            published_date=notice.published_at,
+            document_type=notice.document_type,
+            source=PORTAL_SOURCE_NAME,
+            source_document_id=notice.extri_id,
+            metadata={
+                "official_source": 1,
+                "issuer_name": notice.issuer_name,
+                "issuer_aliases": sorted(aliases),
+                "strict_issuer_name_match": True,
+                "issuer_country": "Bulgaria",
+                "home_member_state": "Bulgaria",
+                "pea_country_check": "eu_candidate",
+                "pea_geography_status": "eu_candidate",
+                "x3news_extri_id": notice.extri_id,
+                "x3news_category": notice.category,
+                "parent_page_url": notice.detail_url,
+                "x3news_url": self.portal_base_url,
+            },
+            classification=notice.document_type,
+            classification_reason=(
+                f"X3News official financial-report category: {notice.category}"
+            ),
+            matched_positive_terms=[notice.category],
+            matched_negative_terms=[],
+            published_at=notice.published_at,
+            period_end_date=notice.period_end_date,
+            reporting_year=notice.reporting_year,
+            date_confidence="high",
+            date_extraction_reason="X3News publication date and official category",
+            source_publication_date_raw=notice.published_at.isoformat(),
+            source_period_date_raw=(
+                notice.period_end_date.isoformat()
+                if notice.period_end_date
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _portal_attachment_is_report(attachment: BulgariaPortalAttachment) -> bool:
+        normalized = _normalize(attachment.title)
+        return not any(
+            marker in normalized
+            for marker in (
+                "excel",
+                "xml",
+                "declaration",
+                "декларац",
+                "inside information",
+                "вътрешна информация",
+                "additional information",
+                "допълнителна информация",
+                "допълнителни справки",
+            )
+        )
+
+    def _materialize_portal_notice(
+        self,
+        notice: BulgariaPortalNotice,
+    ) -> list[DocumentCandidate]:
+        cached = self._portal_detail_cache.get(notice.extri_id)
+        if cached is not None:
+            self._cache_hits += 1
+            return list(cached)
+        html = self._fetch_portal_text(
+            params={
+                "page": "ShowNews",
+                "ExtriID": notice.extri_id,
+                "output": "ajax",
+            },
+            label=f"X3News report {notice.extri_id}",
+        )
+        self._details_visited += 1
+        attachments = parse_x3news_attachments(
+            html,
+            base_url=self.portal_base_url,
+        )
+        detail_period_end, detail_reporting_year = extract_x3news_detail_period(
+            html,
+            notice.document_type,
+        )
+        period_end_date = notice.period_end_date or detail_period_end
+        reporting_year = notice.reporting_year or detail_reporting_year
+        candidates: list[DocumentCandidate] = []
+        for attachment in attachments:
+            if not self._portal_attachment_is_report(attachment):
+                continue
+            file_format = attachment.file_format
+            if not file_format:
+                file_format = self._probe_portal_attachment_format(attachment)
+            if file_format not in SUPPORTED_FORMATS:
+                continue
+            candidates.append(
+                DocumentCandidate(
+                    title=(
+                        f"{notice.issuer_name} - {notice.category} - "
+                        f"{attachment.title}"
+                    ),
+                    url=attachment.download_url,
+                    published_date=notice.published_at,
+                    document_type=notice.document_type,
+                    source=PORTAL_SOURCE_NAME,
+                    source_document_id=(
+                        f"{notice.extri_id}:{attachment.attachment_id}"
+                    ),
+                    metadata={
+                        "official_source": 1,
+                        "issuer_name": notice.issuer_name,
+                        "issuer_aliases": sorted(
+                            {
+                                notice.issuer_name,
+                                _decode_display_name(notice.issuer_name),
+                            }
+                        ),
+                        "strict_issuer_name_match": True,
+                        "issuer_country": "Bulgaria",
+                        "home_member_state": "Bulgaria",
+                        "pea_country_check": "eu_candidate",
+                        "pea_geography_status": "eu_candidate",
+                        "x3news_extri_id": notice.extri_id,
+                        "x3news_attachment_id": attachment.attachment_id,
+                        "x3news_category": notice.category,
+                        "filename": attachment.title,
+                        "file_id": attachment.attachment_id,
+                        "file_format": file_format,
+                        "parent_page_url": notice.detail_url,
+                        "x3news_url": self.portal_base_url,
+                    },
+                    classification=notice.document_type,
+                    classification_reason=(
+                        "X3News official financial-report category: "
+                        f"{notice.category}"
+                    ),
+                    matched_positive_terms=[notice.category],
+                    matched_negative_terms=[],
+                    published_at=notice.published_at,
+                    period_end_date=period_end_date,
+                    reporting_year=reporting_year,
+                    date_confidence="high",
+                    date_extraction_reason=(
+                        "X3News publication date and official category"
+                    ),
+                    source_publication_date_raw=notice.published_at.isoformat(),
+                    source_period_date_raw=(
+                        period_end_date.isoformat()
+                        if period_end_date
+                        else None
+                    ),
+                )
+            )
+        self._portal_detail_cache[notice.extri_id] = tuple(candidates)
+        return candidates
+
+    def _probe_portal_attachment_format(
+        self,
+        attachment: BulgariaPortalAttachment,
+    ) -> str:
+        self._wait()
+        response: requests.Response | None = None
+        source_context = getattr(self.session, "source", None)
+        context = (
+            source_context(PORTAL_SOURCE_NAME)
+            if callable(source_context)
+            else nullcontext()
+        )
+        try:
+            with context, warnings.catch_warnings():
+                if not self.portal_verify_ssl:
+                    warnings.simplefilter("ignore", InsecureRequestWarning)
+                response = self.session.head(
+                    attachment.download_url,
+                    allow_redirects=True,
+                    timeout=self.timeout,
+                    verify=self.portal_verify_ssl,
+                )
+            response.raise_for_status()
+            disposition = str(response.headers.get("Content-Disposition") or "")
+            filename_match = re.search(
+                r"filename\*?=(?:UTF-8''|\")?([^\";]+)",
+                disposition,
+                re.IGNORECASE,
+            )
+            filename = unquote(filename_match.group(1)) if filename_match else ""
+            file_format = PurePosixPath(filename).suffix.casefold().lstrip(".")
+            if file_format in {"xbri", "xbrl"}:
+                file_format = "zip"
+            self.attempts.append(
+                EndpointAttempt(
+                    name=f"X3News attachment {attachment.attachment_id}",
+                    base_url=self.portal_base_url,
+                    dataset="x3news_current_attachment",
+                    endpoint=urlparse(attachment.download_url).path,
+                    method="HEAD",
+                    http_status=response.status_code,
+                    success=True,
+                )
+            )
+            return file_format
+        except Exception as exc:
+            self.attempts.append(
+                EndpointAttempt(
+                    name=f"X3News attachment {attachment.attachment_id}",
+                    base_url=self.portal_base_url,
+                    dataset="x3news_current_attachment",
+                    endpoint=urlparse(attachment.download_url).path,
+                    method="HEAD",
+                    http_status=getattr(response, "status_code", None),
+                    success=False,
+                    error=str(exc),
+                )
+            )
+            return ""
         finally:
             self._last_request_at = time.monotonic()
 
@@ -745,11 +1289,122 @@ class BulgariaBseX3NewsConnector(Connector):
             self.max_candidates_per_source,
         )
         start = since or (date.today() - timedelta(days=self.lookback_days))
-        filings = self._collect_filings(since=start, limit=effective_limit)
-        return [self._filing_candidate(filing) for filing in filings]
+        errors: list[str] = []
+        candidates: list[DocumentCandidate] = []
+        try:
+            notices = self._collect_portal_notices(
+                since=start,
+                until=date.today(),
+                limit=effective_limit,
+            )
+            candidates.extend(
+                self._portal_notice_candidate(notice) for notice in notices
+            )
+        except Exception as exc:
+            errors.append(f"X3News current: {exc}")
+        if not candidates:
+            try:
+                filings = self._collect_filings(
+                    since=start,
+                    limit=effective_limit,
+                )
+                candidates.extend(
+                    self._filing_candidate(filing) for filing in filings
+                )
+            except Exception as exc:
+                errors.append(f"BSE archive: {exc}")
+        self._scanned_notices = len(candidates)
+        if errors:
+            self.mark_degraded("; ".join(errors))
+        elif candidates:
+            self.state = ConnectorState.READY
+            self.last_error = None
+        if not candidates and len(errors) >= 2:
+            raise RuntimeError("; ".join(errors))
+        return candidates[:effective_limit]
+
+    def search_recent_documents_filtered(
+        self,
+        market: str,
+        since: date | None = None,
+        until: date | None = None,
+        document_types: tuple[str, ...] = (),
+        limit: int | None = None,
+    ) -> list[DocumentCandidate]:
+        if market.casefold() != self.market.casefold():
+            return []
+        effective_limit = min(
+            limit or self.max_candidates_per_source,
+            self.max_candidates_per_source,
+        )
+        start = since or (date.today() - timedelta(days=self.lookback_days))
+        end = until or date.today()
+        errors: list[str] = []
+        candidates: list[DocumentCandidate] = []
+        try:
+            notices = self._collect_portal_notices(
+                since=start,
+                until=end,
+                document_types=document_types,
+                limit=effective_limit,
+            )
+            for notice in notices:
+                for candidate in self._materialize_portal_notice(notice):
+                    candidates.append(candidate)
+                    if len(candidates) >= effective_limit:
+                        break
+                if len(candidates) >= effective_limit:
+                    break
+        except Exception as exc:
+            errors.append(f"X3News current: {exc}")
+        if not candidates:
+            try:
+                filings = self._collect_filings(
+                    since=start,
+                    limit=effective_limit,
+                )
+                requested_types = set(document_types)
+                for filing in filings:
+                    candidate = self._filing_candidate(filing)
+                    published_at = candidate.published_at or candidate.published_date
+                    if published_at is None or not (start <= published_at <= end):
+                        continue
+                    if requested_types and candidate.document_type not in requested_types:
+                        continue
+                    candidates.append(candidate)
+                    if len(candidates) >= effective_limit:
+                        break
+            except Exception as exc:
+                errors.append(f"BSE archive: {exc}")
+        self._scanned_notices = len(candidates)
+        if errors:
+            self.mark_degraded("; ".join(errors))
+        elif candidates:
+            self.state = ConnectorState.READY
+            self.last_error = None
+        if not candidates and len(errors) >= 2:
+            raise RuntimeError("; ".join(errors))
+        return candidates[:effective_limit]
 
     def search_documents_for_issuer(self, issuer: Issuer) -> list[DocumentCandidate]:
         start = date.today() - timedelta(days=self.lookback_days)
+        portal_candidates: list[DocumentCandidate] = []
+        try:
+            notices = self._collect_portal_notices(
+                since=start,
+                until=date.today(),
+                limit=self.max_candidates_per_source,
+            )
+            for notice in notices:
+                if not _issuer_query_match(issuer.name, notice.issuer_name):
+                    continue
+                portal_candidates.extend(self._materialize_portal_notice(notice))
+                if len(portal_candidates) >= self.max_candidates_per_source:
+                    break
+        except Exception as exc:
+            self.mark_degraded(f"X3News current: {exc}")
+        if portal_candidates:
+            return portal_candidates[: self.max_candidates_per_source]
         filings = self._collect_filings(
             since=start,
             limit=self.max_candidates_per_source,
@@ -771,6 +1426,16 @@ class BulgariaBseX3NewsConnector(Connector):
         candidate: DocumentCandidate,
         issuer: Issuer,
     ) -> list[DocumentCandidate]:
+        if candidate.source == PORTAL_SOURCE_NAME:
+            extri_id = str(
+                candidate.metadata.get("x3news_extri_id")
+                or candidate.source_document_id
+                or ""
+            )
+            notice = self._portal_notice_cache.get(extri_id)
+            if notice is None:
+                return []
+            return self._materialize_portal_notice(notice)
         return [candidate]
 
     def discover(self, query: str, limit: int = 25) -> BulgariaSourceDiscovery:
@@ -811,6 +1476,67 @@ class BulgariaBseX3NewsConnector(Connector):
             )
 
     def diagnose(self) -> BulgariaSourceDiagnostic:
+        try:
+            notices = self._collect_portal_notices(
+                since=date.today() - timedelta(days=self.lookback_days),
+                until=date.today(),
+                limit=10,
+            )
+            categories: dict[str, int] = {}
+            for notice in notices:
+                categories[notice.document_type] = (
+                    categories.get(notice.document_type, 0) + 1
+                )
+            materialized = (
+                self._materialize_portal_notice(notices[0]) if notices else []
+            )
+            formats = tuple(
+                sorted(
+                    {
+                        str(candidate.metadata.get("file_format") or "")
+                        for candidate in materialized
+                        if candidate.metadata.get("file_format")
+                    }
+                )
+            )
+            example = None
+            if notices:
+                first = notices[0]
+                example = {
+                    "issuer_name": first.issuer_name,
+                    "category": first.category,
+                    "published_at": first.published_at.isoformat(),
+                    "document_type": first.document_type,
+                    "detail_url": first.detail_url,
+                }
+            return BulgariaSourceDiagnostic(
+                source=self.source_name,
+                state=ConnectorState.READY,
+                called_url=self.portal_base_url,
+                http_status=200,
+                method_used="GET X3News paginated HTML and AJAX attachments",
+                total_count=len(notices),
+                detected_count=len(notices),
+                attachment_count=len(materialized),
+                fields=(
+                    "issuer_name",
+                    "category",
+                    "published_at",
+                    "document_type",
+                    "detail_url",
+                ),
+                categories=categories,
+                formats=formats,
+                example_notice=example,
+                http_calls=len(self.attempts),
+                request_efficiency=(
+                    f"{len(self.attempts)} HTTP calls; "
+                    f"{self.portal_max_pages} portal pages max"
+                ),
+                attempts=tuple(self.attempts),
+            )
+        except Exception:
+            pass
         try:
             root_entries = self._fetch_index(
                 self.companies_url,
@@ -897,7 +1623,14 @@ class BulgariaBseX3NewsConnector(Connector):
         since: date | None,
         limit: int | None,
     ) -> int:
-        return 1 + self.max_active_buckets + min(self.max_issuer_scans, 30)
+        effective_limit = min(
+            limit or self.max_candidates_per_source,
+            self.max_candidates_per_source,
+        )
+        return min(
+            self.portal_max_pages,
+            max(1, (effective_limit + PORTAL_RESULTS_PER_PAGE - 1) // PORTAL_RESULTS_PER_PAGE),
+        )
 
     def estimate_issuer_http_requests(self, issuer: Issuer) -> int:
         return 1 + self.max_active_buckets + 1

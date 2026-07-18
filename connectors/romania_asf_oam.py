@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from math import ceil
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,7 +20,6 @@ from models import Issuer
 DEFAULT_BASE_URL = "https://oam.asfromania.ro"
 LISTING_PATH = "/oam/loadedPDFReportsForPublic.jsp"
 DOWNLOAD_PATH = "/oam/DownloadPDFFile.do"
-PERIODIC_PERIOD_TYPES = frozenset({"anuala", "semestriala", "trimestriala"})
 DISCOVER_FALLBACK_ISSUER_QUERIES = ("PETROM", "Transilvania", "Romgaz", "Hidroelectrica")
 SUPPORTED_FORMATS = {"pdf"}
 LISTING_PAGE_SIZE = 10
@@ -75,6 +74,10 @@ NEGATIVE_TERMS = (
     "achizitii",
     "instrainari",
     "calendar financiar",
+    "calendar",
+    "raport consiliul de administratie",
+    "ran501",
+    "ran502",
     "raport curent",
     "comunicat",
     "tlacova sprava",
@@ -165,7 +168,7 @@ def build_romania_download_url(
     filename = _reporting_filename(nume_raportare)
     download_url = (
         f"{base_url.rstrip('/')}{DOWNLOAD_PATH}"
-        f"?nume_raportare={nume_raportare}"
+        f"?{urlencode({'nume_raportare': nume_raportare})}"
     )
     return filename, download_url
 
@@ -889,20 +892,11 @@ class RomaniaAsfOamConnector(Connector):
         return tuple(collected)
 
     def _accepted_notice(self, notice: RomaniaNotice) -> bool:
-        if _normalize(notice.period_type) == "exceptionala":
-            return (
-                classify_romania_document(
-                    notice.title,
-                    notice.period_type,
-                )[0]
-                != "other_regulatory_announcement"
-            )
-        if _normalize(notice.period_type) in PERIODIC_PERIOD_TYPES:
-            return True
         return (
             classify_romania_document(
                 notice.title,
                 notice.period_type,
+                notice.files[0].filename if notice.files else "",
             )[0]
             != "other_regulatory_announcement"
         )

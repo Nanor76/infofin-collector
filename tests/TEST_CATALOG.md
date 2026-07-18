@@ -45,9 +45,10 @@ npm run test:e2e:list
 | `webapp/services/exports.py` | `test_web_api.py` et tests du service concernes | pour le telechargement, le nom ou le contenu du fichier |
 | `webapp/jobs.py` | `test_web_jobs.py` | si les transitions, compteurs, alertes ou rafraichissements changent |
 | `webapp/repositories.py` | `test_web_repository.py` | si tri, filtre, pagination ou donnees visibles changent |
+| `webapp/firestore_repository.py`, `webapp/cloud_jobs.py`, `webapp/run_job.py` | `test_web_cloud.py` | pour le stockage Firestore, le lancement distant, le worker et la configuration Google Cloud |
 | `webapp/schemas.py` | `test_web_api.py` | si le formulaire ou les erreurs de validation changent |
 | `db.py` | `test_db.py` et test repository concerne | si la modification atteint un parcours utilisateur |
-| `classification.py` | `test_classification.py` | si la classification est exposee dans la webapp |
+| `classification.py`, `classification_audit.py` | `test_classification.py`, `test_classification_audit.py` | si la classification ou son audit est expose dans la webapp |
 | `download.py`, `http_client.py` | `test_download.py`, `test_ssl_verification.py` | seulement si le comportement visible de la webapp change |
 | `main.py`, `operations.py` | `test_main.py`, `test_operations.py` | si le lancement ou une action utilisateur web change |
 | `watcher.py` | `test_watcher.py`, `test_source_first_watch.py`, tests `*_watch.py` | si les donnees collectees sont exposees dans la webapp |
@@ -64,7 +65,8 @@ npm run test:e2e:list
 | Groupe | Cas existants | Modifier lorsque |
 | --- | --- | --- |
 | Referentiels | `test_get_markets`, `test_get_document_types`, `test_get_health` | une liste, une valeur ou la sante change |
-| Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_get_unknown_search_returns_404`, `test_private_search_controls_are_not_exposed` | payload public, identifiant, statut, erreur ou surface de documentation change |
+| Authentification | `test_password_protects_every_web_route` | défi HTTP Basic global, identifiants ou couverture des routes change |
+| Creation et statut | `test_post_search_returns_job_id`, `test_get_search_status`, `test_queued_search_is_publicly_reported_as_running`, `test_get_unknown_search_returns_404`, `test_private_search_controls_are_not_exposed` | payload public, identifiant, statut, erreur ou surface de documentation change |
 | Resultats API | `test_get_search_results_paginates` | pagination, structure JSON ou adresse officielle du document change |
 | Page de recherche | `test_get_home_contains_form`, `test_home_interactive_elements_have_test_ids` | formulaire, controle ou `data-testid` change |
 | Page de resultats | `test_get_results_page_with_fake_job`, `test_results_interactive_elements_have_test_ids` | tableau, action, filtre ou export change |
@@ -113,6 +115,7 @@ teste sans navigateur.
 | `test_submit_partial_when_errors_and_results` | statut partiel avec erreurs et resultats |
 | `test_submit_failed_when_errors_without_results` | statut echoue sans resultat |
 | `test_cancel_on_finished_job_does_not_break` | annulation non destructive d'un job termine |
+| `test_worker_failure_marks_job_failed` | exception inattendue convertie en état terminal persistant |
 
 ### Repository — `tests/test_web_repository.py`
 
@@ -126,16 +129,34 @@ teste sans navigateur.
 | `test_list_results_sort_whitelist` | liste blanche de tri |
 | `test_upsert_market_run_and_purge` | executions par marche et purge |
 
+### Google Cloud — `tests/test_web_cloud.py`
+
+| Cas | Responsabilite |
+| --- | --- |
+| `test_cloud_settings_are_loaded_from_environment` | sélection explicite de Firestore, Cloud Tasks, file, URL du service et identifiants HTTP par environnement |
+| `test_firestore_repository_persists_filters_and_purges` | contrat de persistance, filtrage et suppression en cascade sans réseau |
+| `test_cloud_run_launcher_overrides_the_search_job_id` | URL Cloud Run v2 et surcharge isolée de l'identifiant de recherche |
+| `test_cloud_tasks_launcher_targets_the_warm_service` | création d'une tâche HTTP authentifiée vers le worker du service maintenu chaud |
+| `test_cloud_job_manager_persists_before_dispatch` | persistance du job avant son lancement distant |
+| `test_cloud_job_manager_marks_dispatch_failure` | état terminal explicite lorsque l'API Cloud Run est indisponible |
+| `test_cloud_worker_executes_the_persisted_request` | reprise de la requête Firestore et écriture du résultat par le worker |
+| `test_cloud_tasks_worker_endpoint_executes_once` | exécution idempotente d'une tâche sur le worker HTTP interne |
+| `test_cloud_app_uses_shared_repository_without_sqlite` | intégration FastAPI, Firestore et dispatcher sans création de fichier SQLite |
+| `test_google_cloud_deployment_assets_keep_free_tier_guards` | conteneur, worker Cloud Tasks chaud, file séquentielle sans relance, secret mobile et garde-fous de coût |
+
 ## Catalogue Playwright
 
 Les cas sont dans `tests/e2e/essential-flows.spec.ts` :
 
 | Cas | Responsabilites protegees | Fixtures principales |
 | --- | --- | --- |
-| `la recherche permet de sélectionner les critères et affiche les résultats` | carte chargee, criteres periodiques annuel/semestriel/trimestriel, payload POST, navigation, statut et premiere page | 51 rapports periodiques |
+| `la recherche permet de sélectionner les critères et affiche les résultats` | refus sans mot de passe, accès HTTP Basic, sante SQLite/local, carte chargee, criteres periodiques annuel/semestriel/trimestriel, payload POST, navigation, statut et premiere page | 51 rapports periodiques |
 | `la sélection rapide, la carte et la validation restent synchronisées` | Tous/Aucun, synchronisation France, soumission sans marche | marches du formulaire et dialogue de validation |
+| `l'état technique queued est affiché comme une recherche en cours` | état persistant initial masqué derrière `running`, puis transition vers `done` via le worker interne chaud | recherche maintenue en file puis exécutée par l'endpoint Cloud Tasks |
+| `une recherche par type exclut les autres périodicités` | filtre annuel strict et absence de rapports semestriels ou trimestriels dans les resultats | 51 rapports annuels |
 | `les filtres HTMX couvrent le type, le texte et l'état vide` | absence du filtre ISIN redondant, filtre de type, ligne Beta, recherche sans resultat, compteur et vide | un rapport semestriel unique parmi 51 documents |
 | `le tri, la pagination et l'export CSV sont opérationnels` | pages 1/2, retour, tri societe, nom et contenu CSV | 51 documents sur Paris et Oslo |
+| `le tableau mobile conserve son défilement horizontal après la fin de la recherche` | arrêt du polling terminal et conservation de la position horizontale jusqu'au bouton d'ouverture | viewport smartphone et 51 documents terminés |
 | `les métadonnées techniques restent masquées et les documents s'ouvrent à leur adresse officielle` | absence de source et identifiant techniques ; lien officiel direct, ouverture HTTP 200 et absence du bouton de copie | provenance interne sentinelle et URL officielle interceptee des 51 documents |
 
 Fichiers de support :
@@ -170,11 +191,17 @@ Le nommage permet de router rapidement les changements hors webapp :
 
 - `test_<pays>_connector.py` : parsing et comportement du connecteur avec les
   fixtures de `tests/fixtures/` ;
+- `test_poland_connector.py` : classification KNF, matérialisation et plafond
+  de pagination couvrant une journée volumineuse de 18 pages ;
 - `test_<pays>_watch.py` : integration du connecteur dans la collecte ;
 - `test_<pays>_migration.py` : compatibilite ou migration des donnees ;
 - `test_<pays>_live.py` et cas marques `live` : verification reseau opt-in ;
+- `test_bulgaria_connector.py` : archive BSE, listing X3News courant,
+  classification des periodicites, pieces jointes et filtrage annuel par dates ;
 - `test_db.py`, `test_download.py`, `test_classification.py`,
-  `test_load_watchlist.py`, `test_issuer_list_sync.py` : briques centrales ;
+  `test_classification_audit.py`, `test_load_watchlist.py`,
+  `test_issuer_list_sync.py` : briques centrales et audit independant des
+  categories produites ;
 - `test_market_document_links.py`, `test_operations.py`, `test_main.py` :
   orchestration et interfaces de commande ;
 - `test_ssl_verification.py` : politiques SSL des integrations ;

@@ -143,7 +143,7 @@ class Settings:
     poland_knf_oam_lookback_days: int = 30
     poland_knf_oam_rate_limit_seconds: float = 0.2
     poland_knf_oam_verify_ssl: bool = True
-    poland_knf_oam_max_pages_per_date: int = 10
+    poland_knf_oam_max_pages_per_date: int = 25
     czechia_cnb_oam_start_url: str = (
         "https://oam.cnb.cz/sipresextdad/SIPRESWEB.WEB21.START_INPUT_OAM?p_lang=en"
     )
@@ -195,7 +195,10 @@ class Settings:
     bulgaria_bse_x3news_verify_ssl: bool = True
     bulgaria_bse_x3news_max_active_buckets: int = 3
     bulgaria_bse_x3news_max_issuer_scans: int = 30
-    bulgaria_bse_x3news_max_candidates_per_source: int = 40
+    bulgaria_bse_x3news_max_candidates_per_source: int = 200
+    bulgaria_x3news_base_url: str = "https://www.x3news.com"
+    bulgaria_x3news_verify_ssl: bool = False
+    bulgaria_x3news_max_pages: int = 100
     malta_mse_oam_base_url: str = "https://www.borzamalta.com.mt"
     malta_mse_oam_lookback_days: int = 365
     malta_mse_oam_rate_limit_seconds: float = 0.5
@@ -205,6 +208,16 @@ class Settings:
     web_workers: int = 2
     web_max_period_days: int = 370
     web_max_candidates: int = 100000
+    web_storage_backend: str = "sqlite"
+    web_job_backend: str = "local"
+    google_cloud_project: str = ""
+    google_cloud_region: str = "europe-west1"
+    cloud_run_search_job: str = "infofin-search"
+    cloud_tasks_queue: str = "infofin-search-queue"
+    web_service_url: str = ""
+    firestore_collection_prefix: str = "infofin_web"
+    web_access_username: str = "infofin"
+    web_access_password: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -469,7 +482,7 @@ class Settings:
             ).lower() != "false",
             poland_knf_oam_max_pages_per_date=max(
                 1,
-                _env_int("POLAND_KNF_OAM_MAX_PAGES_PER_DATE", 10),
+                _env_int("POLAND_KNF_OAM_MAX_PAGES_PER_DATE", 25),
             ),
             czechia_cnb_oam_start_url=os.getenv(
                 "CZECHIA_CNB_OAM_START_URL",
@@ -644,7 +657,18 @@ class Settings:
             ),
             bulgaria_bse_x3news_max_candidates_per_source=max(
                 1,
-                _env_int("BULGARIA_BSE_X3NEWS_MAX_CANDIDATES_PER_SOURCE", 40),
+                _env_int("BULGARIA_BSE_X3NEWS_MAX_CANDIDATES_PER_SOURCE", 200),
+            ),
+            bulgaria_x3news_base_url=os.getenv(
+                "BULGARIA_X3NEWS_BASE_URL",
+                "https://www.x3news.com",
+            ).rstrip("/"),
+            bulgaria_x3news_verify_ssl=os.getenv(
+                "BULGARIA_X3NEWS_VERIFY_SSL", "false"
+            ).lower() != "false",
+            bulgaria_x3news_max_pages=max(
+                1,
+                _env_int("BULGARIA_X3NEWS_MAX_PAGES", 100),
             ),
             malta_mse_oam_base_url=os.getenv(
                 "MALTA_MSE_OAM_BASE_URL",
@@ -666,4 +690,32 @@ class Settings:
             web_workers=_env_int("INFOFIN_WEB_WORKERS", 2),
             web_max_period_days=_env_int("INFOFIN_WEB_MAX_PERIOD_DAYS", 370),
             web_max_candidates=_env_int("INFOFIN_WEB_MAX_CANDIDATES", 100000),
+            web_storage_backend=os.getenv(
+                "INFOFIN_WEB_STORAGE_BACKEND", "sqlite"
+            ).strip().lower(),
+            web_job_backend=os.getenv(
+                "INFOFIN_WEB_JOB_BACKEND", "local"
+            ).strip().lower(),
+            google_cloud_project=os.getenv(
+                "GOOGLE_CLOUD_PROJECT", ""
+            ).strip(),
+            google_cloud_region=os.getenv(
+                "GOOGLE_CLOUD_REGION", "europe-west1"
+            ).strip(),
+            cloud_run_search_job=os.getenv(
+                "INFOFIN_CLOUD_RUN_JOB", "infofin-search"
+            ).strip(),
+            cloud_tasks_queue=os.getenv(
+                "INFOFIN_CLOUD_TASKS_QUEUE", "infofin-search-queue"
+            ).strip(),
+            web_service_url=os.getenv("INFOFIN_WEB_SERVICE_URL", "").strip(),
+            firestore_collection_prefix=os.getenv(
+                "INFOFIN_FIRESTORE_PREFIX", "infofin_web"
+            ).strip(),
+            web_access_username=os.getenv(
+                "INFOFIN_WEB_ACCESS_USERNAME", "infofin"
+            ),
+            web_access_password=os.getenv(
+                "INFOFIN_WEB_ACCESS_PASSWORD", ""
+            ),
         )

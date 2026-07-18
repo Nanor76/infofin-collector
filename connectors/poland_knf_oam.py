@@ -503,7 +503,7 @@ class PolandKnfOamConnector(Connector):
         lookback_days: int = 30,
         timeout: int = 45,
         verify_ssl: bool = True,
-        max_pages_per_date: int = 10,
+        max_pages_per_date: int = 25,
         cache_path: str | Path | None = None,
     ) -> None:
         self.session = session

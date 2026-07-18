@@ -134,6 +134,19 @@ def test_negative_terms_override_periodic_terms(title: str) -> None:
     assert negative
 
 
+def test_publication_date_announcement_is_not_a_half_year_report() -> None:
+    classification, _, _, negative = classify_latvia_document(
+        (
+            "BluOr Bank AS announces the date of publication of the financial "
+            "report for the first half of 2026"
+        ),
+        "Half-year financial reports",
+    )
+
+    assert classification == "other_regulatory_announcement"
+    assert negative
+
+
 def test_latvian_governance_attachment_is_rejected() -> None:
     classification, reason, _, negative = classify_latvia_document(
         "Latvenergo koncerna revidētie 2025. gada rezultāti",

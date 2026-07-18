@@ -4,11 +4,12 @@ import time
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from db import Database
-from webapp.jobs import JobManager
+from webapp.jobs import JobManager, run_stored_search
 from webapp.repositories import WebSearchRepository
 from webapp.services.document_search import (
-    DocumentSearchService,
     LinkSearchDocument,
     LinkSearchRequest,
     LinkSearchResultSet,
@@ -142,3 +143,28 @@ def test_cancel_on_finished_job_does_not_break(tmp_path: Path) -> None:
     _wait_for_status(manager, job_id, "done")
     assert manager.cancel(job_id) is False
     manager.shutdown()
+
+
+class FailingSearchService:
+    def search_links(self, request: LinkSearchRequest) -> LinkSearchResultSet:
+        raise RuntimeError("unexpected worker failure")
+
+
+def test_worker_failure_marks_job_failed(tmp_path: Path) -> None:
+    database = Database(tmp_path / "failed-worker.sqlite3")
+    database.initialize_web_search_schema()
+    repository = WebSearchRepository(database)
+    repository.create_job("job-failed", _request())
+
+    with pytest.raises(RuntimeError, match="unexpected worker failure"):
+        run_stored_search(
+            repository=repository,
+            search_service=FailingSearchService(),  # type: ignore[arg-type]
+            job_id="job-failed",
+            request=_request(),
+        )
+
+    job = repository.get_job("job-failed")
+    assert job is not None
+    assert job["status"] == "failed"
+    assert job["errors"] == ["La recherche a échoué pendant son exécution."]

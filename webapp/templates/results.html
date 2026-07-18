@@ -42,9 +42,11 @@
     
     <div
       id="job-status"
+      {% if not is_terminal %}
       hx-get="/partials/searches/{{ job_id }}/status"
-      hx-trigger="load, every 2s"
+      hx-trigger="load, every 2s [infofinShouldPollResults()]"
       hx-swap="innerHTML"
+      {% endif %}
       class="job-status-wrapper"
       data-testid="results-status-region"
     >
@@ -67,8 +69,9 @@
       class="filters-form"
       hx-get="/partials/searches/{{ job_id }}/results"
       hx-target="#results-table"
-      hx-trigger="change, keyup delay:200ms, submit"
+      hx-trigger="change, input changed delay:200ms, submit"
       hx-include="#results-filters"
+      hx-sync="this:replace"
       data-testid="results-filter-form"
     >
       <input type="hidden" name="sort" value="-published_at">

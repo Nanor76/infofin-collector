@@ -22,6 +22,12 @@ class SearchCreateResponse(BaseModel):
     results_url: str
 
 
+class InternalSearchRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str = Field(min_length=1, max_length=128)
+
+
 class SearchMarketStatus(BaseModel):
     market: str
     status: str

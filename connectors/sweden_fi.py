@@ -633,7 +633,73 @@ def classify_sweden_document(
             matched_negatives,
         )
 
-    # 1. Annual Financial Report
+    # Le titre décrit le document réellement publié et prime donc sur une
+    # rubrique source trop large ou erronée. Un semestriel Q2 reste un
+    # semestriel : Q2 n'est ici qu'un repère calendaire.
+    if any(
+        marker in t_lower
+        for marker in (
+            "half-year report",
+            "half year report",
+            "halvårsrapport",
+        )
+    ):
+        return (
+            "half_year_financial_report",
+            "Classifié comme rapport semestriel d'après le titre.",
+            matched_positives,
+            matched_negatives,
+        )
+    if any(
+        marker in t_lower
+        for marker in ("year-end report", "bokslutskommuniké")
+    ):
+        return (
+            "year_end_report",
+            "Classifié comme rapport de fin d'année d'après le titre.",
+            matched_positives,
+            matched_negatives,
+        )
+    if (
+        any(
+            marker in t_lower
+            for marker in ("quarterly report", "kvartalsrapport", "kvartal")
+        )
+        or any(
+            re.search(rf"\b{quarter}\b", t_lower)
+            for quarter in ("q1", "q2", "q3", "q4")
+        )
+    ):
+        return (
+            "quarterly_financial_report",
+            "Classifié comme rapport trimestriel d'après le titre.",
+            matched_positives,
+            matched_negatives,
+        )
+    if any(marker in t_lower for marker in ("interim report", "delårsrapport")):
+        return (
+            "interim_report",
+            "Classifié comme rapport intermédiaire d'après le titre.",
+            matched_positives,
+            matched_negatives,
+        )
+    if any(
+        marker in t_lower
+        for marker in (
+            "annual report",
+            "annual financial report",
+            "årsredovisning",
+            "årsrapport",
+        )
+    ):
+        return (
+            "annual_financial_report",
+            "Classifié comme rapport financier annuel d'après le titre.",
+            matched_positives,
+            matched_negatives,
+        )
+
+    # Repli sur la catégorie ou l'URL lorsqu'aucun titre explicite ne tranche.
     if any(p in t_lower or p in c_lower or p in u_lower for p in ["annual report", "annual financial report", "årsredovisning", "årsrapport"]):
         return (
             "annual_financial_report",
@@ -660,7 +726,7 @@ def classify_sweden_document(
     # 4. Quarterly Report
     if any(p in t_lower or p in c_lower or p in u_lower for p in ["quarterly report", "kvartalsrapport", "kvartal"]) or any(q in t_lower for q in ["q1", "q2", "q3", "q4"]):
         return (
-            "quarterly_report",
+            "quarterly_financial_report",
             "Classifié comme rapport trimestriel.",
             matched_positives,
             matched_negatives,

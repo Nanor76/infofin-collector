@@ -14,7 +14,7 @@ python -m pytest -q
 Pour limiter l'execution aux composants de la webapp :
 
 ```powershell
-python -m pytest tests/test_web_api.py tests/test_web_document_search.py tests/test_web_filters.py tests/test_web_jobs.py tests/test_web_repository.py tests/test_test_catalog.py -q
+python -m pytest tests/test_web_api.py tests/test_web_cloud.py tests/test_web_document_search.py tests/test_web_filters.py tests/test_web_jobs.py tests/test_web_repository.py tests/test_test_catalog.py -q
 ```
 
 ## Maintenance obligatoire a chaque evolution
@@ -46,10 +46,12 @@ Matrice d'impact minimale :
 | Route, validation ou schema API | `tests/test_web_api.py` | codes, payloads et erreurs metier |
 | Service de recherche ou filtres | `tests/test_web_document_search.py`, `tests/test_web_filters.py` | cas nominal, limites et absence de resultat |
 | Jobs ou repository | `tests/test_web_jobs.py`, `tests/test_web_repository.py` | transitions d'etat, persistance et erreurs |
+| Configuration de déploiement Google Cloud | `tests/test_web_cloud.py` | Cloud Tasks, worker chaud, profils économique/performance, ressources, secrets et garde-fous de coût |
 | Template ou controle HTML | `tests/test_web_api.py` et `tests/e2e/*.spec.ts` | contrat `data-testid` et parcours utilisateur |
 | JavaScript, carte ou soumission | `tests/e2e/*.spec.ts` | payload, navigation, synchronisation et erreur visible |
 | HTMX, tri, filtre ou pagination | pytest sur le partial et Playwright | contenu remplace, compteurs et conservation des filtres |
 | Export | pytest du service/API et Playwright | nom, format et contenu telecharge |
+| Connecteur officiel | `tests/test_<pays>_connector.py`, puis `tests/test_<pays>_watch.py` | parsing, pagination, limites et isolation hors réseau |
 | Correction de bug | test de regression au niveau concerne | le test doit echouer sans le correctif |
 | Suppression ou renommage | cas, fixtures et registre de couverture | aucun selecteur ou scenario orphelin |
 
@@ -93,10 +95,11 @@ La couverture essentielle est repartie ainsi :
 
 | Parcours | Verifications principales |
 | --- | --- |
-| Recherche | chargement de la carte, selection d'un marche, dates, types periodiques annuel/semestriel/trimestriel, payload API, navigation et resultats |
+| Recherche | refus HTTP sans mot de passe, accès HTTP Basic, sante locale SQLite/local, chargement de la carte, selection d'un marche, dates, types periodiques annuel/semestriel/trimestriel, payload API, navigation, resultats et exclusion stricte des autres periodicites |
+| Statut initial | etat technique `queued` expose comme `running`, puis transition vers « Terminée » par le worker interne chaud |
 | Selection | boutons Tous/Aucun, synchronisation carte-liste et validation sans marche |
 | Filtres | absence du filtre ISIN redondant, mise a jour HTMX par type et texte, ciblage d'une ligne et etat vide |
-| Resultats | tri, pagination aller-retour et telechargement CSV |
+| Resultats | tri, pagination aller-retour, telechargement CSV et stabilité du défilement horizontal mobile après l'arrêt du polling |
 | Confidentialite | champs techniques de collecte absents des pages, de l'API et des exports ; ouverture directe de l'adresse officielle du document |
 
 ### Installation et execution
@@ -143,7 +146,7 @@ repertoires comme artefacts uniquement en cas d'echec.
 La commande de validation web minimale avant livraison est :
 
 ```powershell
-python -m pytest tests/test_web_api.py tests/test_web_document_search.py tests/test_web_filters.py tests/test_web_jobs.py tests/test_web_repository.py tests/test_test_catalog.py -q
+python -m pytest tests/test_web_api.py tests/test_web_cloud.py tests/test_web_document_search.py tests/test_web_filters.py tests/test_web_jobs.py tests/test_web_repository.py tests/test_test_catalog.py -q
 npm run test:e2e
 ```
 
@@ -153,6 +156,30 @@ accessible, utiliser un repertoire local au projet :
 ```powershell
 python -m pytest -q --basetemp=pytest_tmp/local-run
 ```
+
+## Audit live de la categorisation
+
+`classification_audit.py` compare la categorie produite par chaque connecteur
+avec les indices independants du titre et des metadonnees officielles. La
+commande `all` couvre tous les marches declares dans
+`connectors.SUPPORTED_WATCH_MARKETS`, y compris les marches d'Europe centrale
+et orientale :
+
+```powershell
+python classification_audit.py --batch all --since 2026-01-01 --limit 300
+```
+
+Limiter l'audit a un ou plusieurs marches :
+
+```powershell
+python classification_audit.py --market "Bucharest Stock Exchange" --market "Nasdaq Stockholm" --since 2026-01-01
+```
+
+Cet audit appelle les sources officielles et reste donc hors de la suite
+standard sans reseau. Les fichiers JSON et CSV produits dans `reports/`
+distinguent `MATCH`, `CONFLICT` et `NO_TITLE_SIGNAL`. Un conflit doit etre
+examine ; l'absence d'indice dans le titre n'est pas a elle seule une erreur
+lorsqu'une categorie source exacte fait autorite.
 
 ## Tests d'integration live
 
@@ -185,6 +212,13 @@ python -m pytest tests/test_estonia_connector.py -k "live" -q
 python -m pytest tests/test_latvia_connector.py -k "live" -q
 python -m pytest tests/test_lithuania_connector.py -k "live" -q
 python -m pytest tests/test_slovenia_connector.py -k "live" -q
+```
+
+La Bulgarie combine le portail X3News courant et l'archive historique BSE.
+Le diagnostic live verifie en priorite le portail courant et ses pieces jointes :
+
+```powershell
+python main.py diagnose-source bulgaria
 ```
 
 Desactiver ensuite le mode live si le terminal reste ouvert :

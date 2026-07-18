@@ -70,6 +70,7 @@ POSITIVE_RULES = (
             "halvårsrapport",
             "halvår",
             "halvaar",
+            "h1",
         ),
     ),
     ("quarterly_report", ("quarterly report", "kvartalsrapport")),

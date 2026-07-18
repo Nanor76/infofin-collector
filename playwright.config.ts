@@ -18,6 +18,10 @@ export default defineConfig({
     baseURL,
     locale: "fr-FR",
     timezoneId: "Europe/Paris",
+    httpCredentials: {
+      username: "e2e-user",
+      password: "e2e-password",
+    },
     testIdAttribute: "data-testid",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

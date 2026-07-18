@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -24,6 +25,7 @@ class FakeJobManager:
     def __init__(self, repository: WebSearchRepository) -> None:
         self.repository = repository
         self.job_id = "fakejob1234567890abcdef1234567890ab"
+        self.queued_job_id = "queuedjob1234567890abcdef1234567890a"
         self.running_job_id = "runningjob1234567890abcdef123456789"
         self.alert_job_id = "alertjob1234567890abcdef12345678901"
         self.paginated_job_id = "pagejob1234567890abcdef1234567890ab"
@@ -76,6 +78,14 @@ class FakeJobManager:
             results_count=1,
             warnings=(),
             errors=(),
+        )
+        self.repository.create_job(
+            self.queued_job_id,
+            LinkSearchRequest(
+                markets=("Euronext Paris",),
+                date_from=date(2026, 6, 1),
+                date_to=date(2026, 6, 30),
+            ),
         )
         self.repository.create_job(
             self.running_job_id,
@@ -244,6 +254,27 @@ def test_get_search_status(client: TestClient) -> None:
     assert "fake-oam" not in response.text
 
 
+def test_queued_search_is_publicly_reported_as_running(
+    client: TestClient,
+) -> None:
+    job_id = "queuedjob1234567890abcdef1234567890a"
+
+    api_response = client.get(f"/api/searches/{job_id}")
+    page_response = client.get(f"/searches/{job_id}")
+
+    assert api_response.status_code == 200
+    assert api_response.json()["status"] == "running"
+    assert page_response.status_code == 200
+    soup = BeautifulSoup(page_response.text, "html.parser")
+    status = soup.select_one('[data-testid="results-job-status"]')
+    state = soup.select_one('[data-testid="results-job-state"]')
+    assert status is not None
+    assert status["data-status"] == "running"
+    assert state is not None
+    assert state.get_text(" ", strip=True) == "En cours"
+    assert "queued" not in str(status)
+
+
 def test_get_unknown_search_returns_404(client: TestClient) -> None:
     response = client.get("/api/searches/unknown")
     assert response.status_code == 404
@@ -308,7 +339,49 @@ def test_get_document_types(client: TestClient) -> None:
 def test_get_health(client: TestClient) -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "ok",
+        "storage_backend": "sqlite",
+        "job_backend": "local",
+    }
+
+
+def test_password_protects_every_web_route(client: TestClient) -> None:
+    settings = replace(
+        client.app.state.settings,
+        web_access_username="mobile-user",
+        web_access_password="mobile-password",
+    )
+    app = create_app(
+        settings=settings,
+        database=client.app.state.database,
+        repository=client.app.state.repository,
+        job_manager=client.app.state.job_manager,
+    )
+
+    with TestClient(app) as protected_client:
+        unauthenticated = protected_client.get("/api/health")
+        wrong_password = protected_client.get(
+            "/api/health",
+            auth=("mobile-user", "wrong-password"),
+        )
+        authenticated = protected_client.get(
+            "/api/health",
+            auth=("mobile-user", "mobile-password"),
+        )
+        static_asset = protected_client.get(
+            "/static/app.css",
+            auth=("mobile-user", "mobile-password"),
+        )
+
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.headers["www-authenticate"] == (
+        'Basic realm="InfoFin", charset="UTF-8"'
+    )
+    assert wrong_password.status_code == 401
+    assert authenticated.status_code == 200
+    assert authenticated.json()["status"] == "ok"
+    assert static_asset.status_code == 200
 
 
 def test_get_home_contains_form(client: TestClient) -> None:
@@ -368,7 +441,7 @@ def test_get_results_page_with_fake_job(client: TestClient) -> None:
     job_id = "fakejob1234567890abcdef1234567890ab"
     response = client.get(f"/searches/{job_id}")
     assert response.status_code == 200
-    assert 'hx-trigger="load, every 2s"' in response.text
+    assert 'data-testid="results-status-region"' in response.text
     assert "Annual report" in response.text
     partial = client.get(f"/partials/searches/{job_id}/results")
     assert partial.status_code == 200
@@ -429,6 +502,7 @@ def test_results_interactive_elements_have_test_ids(client: TestClient) -> None:
             "results-filter-market-input",
             "results-filter-query-input",
             "results-table-region",
+            "results-table-scroll-container",
             "results-summary",
             "results-total-count",
             "results-current-page",
@@ -531,11 +605,21 @@ def test_terminal_results_page_does_not_auto_poll_results(
     response = client.get(f"/searches/{job_id}")
 
     soup = BeautifulSoup(response.text, "html.parser")
+    status_region = soup.select_one("#job-status")
     status = soup.select_one("#job-status .job-status")
+    filters = soup.select_one("#results-filters")
     results = soup.select_one("#results-table")
 
+    assert status_region is not None
+    assert not status_region.has_attr("hx-trigger")
+    assert not status_region.has_attr("hx-get")
     assert status is not None
     assert status["data-terminal"] == "true"
+    assert filters is not None
+    assert filters["hx-trigger"] == (
+        "change, input changed delay:200ms, submit"
+    )
+    assert filters["hx-sync"] == "this:replace"
     assert results is not None
     assert not results.has_attr("hx-trigger")
     assert not results.has_attr("hx-get")
@@ -548,9 +632,14 @@ def test_running_results_page_polls_with_current_filters(
     response = client.get(f"/searches/{job_id}")
 
     soup = BeautifulSoup(response.text, "html.parser")
+    status_region = soup.select_one("#job-status")
     status = soup.select_one("#job-status .job-status")
     results = soup.select_one("#results-table")
 
+    assert status_region is not None
+    assert status_region["hx-trigger"] == (
+        "load, every 2s [infofinShouldPollResults()]"
+    )
     assert status is not None
     assert status["data-terminal"] == "false"
     assert results is not None

@@ -4,7 +4,11 @@ from pathlib import Path
 from typing import Any
 
 from connectors.base import ConnectorState
-from connectors.oslo_newsweb import OsloNewsWebConnector
+from connectors.oslo_newsweb import (
+    OsloNewsWebConnector,
+    _attachment_type,
+    _is_financial_notice,
+)
 from models import Issuer
 
 
@@ -159,6 +163,51 @@ def test_search_documents_handles_pagination_and_attachment_types() -> None:
         url == "https://newsweb.oslobors.no/message/667877"
         for url, _ in session.calls
     )
+
+
+def test_local_period_terms_refine_the_broad_source_topic() -> None:
+    half_year_topic = (
+        "Halvårsrapporter og revisjonsberetninger / uttalelser om "
+        "forenklet revisorkontroll"
+    )
+
+    assert _attachment_type(
+        "Sparebanken Øst - regnskap 2. kvartal 2026",
+        half_year_topic,
+        "",
+    ) == "quarterly_financial_report"
+    assert _attachment_type(
+        "Rapport for 2. kvartal og 1. halvår 2026",
+        half_year_topic,
+        "",
+    ) == "half_year_financial_report"
+    assert _attachment_type(
+        "Vasakronans delårsrapport januari-juni 2026",
+        half_year_topic,
+        "",
+    ) == "half_year_financial_report"
+    assert _attachment_type(
+        "Lerøy Seafood Group ASA: Oppdatering volum i andre kvartal 2026",
+        half_year_topic,
+        "",
+    ) is None
+    assert _is_financial_notice(
+        "Lerøy Seafood Group ASA: Oppdatering volum i andre kvartal 2026",
+        half_year_topic,
+    ) is False
+    assert _attachment_type(
+        (
+            "POLARIS RENEWABLE ENERGY ANNOUNCES RESULTS OF DIRECTOR "
+            "ELECTIONS AT ANNUAL AND SPECIAL MEETING"
+        ),
+        "Annual financial and audit Reports",
+        "",
+    ) is None
+    assert _attachment_type(
+        "Envipco 2025 Annual Report and Notice of Annual General Meeting",
+        "Annual financial and audit Reports",
+        "",
+    ) == "annual_financial_report"
 
 
 def test_diagnose_and_discover_return_real_page_shapes() -> None:

@@ -330,10 +330,13 @@ def connector_for_market(
         return BulgariaBseX3NewsConnector(
             session=session,
             base_url=settings.bulgaria_bse_x3news_base_url,
+            portal_base_url=settings.bulgaria_x3news_base_url,
             rate_limit_seconds=settings.bulgaria_bse_x3news_rate_limit_seconds,
             lookback_days=settings.bulgaria_bse_x3news_lookback_days,
             timeout=settings.http_timeout_seconds,
             verify_ssl=settings.bulgaria_bse_x3news_verify_ssl,
+            portal_verify_ssl=settings.bulgaria_x3news_verify_ssl,
+            portal_max_pages=settings.bulgaria_x3news_max_pages,
             max_active_buckets=settings.bulgaria_bse_x3news_max_active_buckets,
             max_issuer_scans=settings.bulgaria_bse_x3news_max_issuer_scans,
             max_candidates_per_source=(

@@ -29,8 +29,14 @@ def _is_non_report_notice(text: str) -> bool:
             "postponement of publication",
             "delay of publication",
             "delayed publication",
+            "announces the date of publication",
+            "date of publication of the financial report",
+            "publication date of the financial report",
+            "financial calendar",
         )
     ):
+        return True
+    if re.fullmatch(r"calendar(?:\s*\d+)?", text):
         return True
     return False
 
@@ -40,11 +46,12 @@ def classify_document(
     url: str = "",
     content_type: str = "",
 ) -> str | None:
+    title_text = _normalize(title)
     text = _normalize(f"{title} {url}")
     extension = _url_extension(url)
     mime = (content_type or "").casefold().split(";", 1)[0].strip()
 
-    if _is_non_report_notice(text):
+    if _is_non_report_notice(title_text):
         return None
 
     if (
@@ -55,8 +62,43 @@ def classify_document(
     ):
         return "universal_registration_document"
 
+    # Les intitulés explicites de période priment sur les simples repères Q2/Q4.
+    # Ainsi, « Half-year report (Q2) » reste un rapport semestriel.
     if (
-        "quarterly report" in text
+        "rapport financier semestriel" in text
+        or "half-year financial report" in text
+        or "half-yearly financial report" in text
+        or "half year financial report" in text
+        or "half yearly financial report" in text
+        or "semi-annual financial report" in text
+        or "semi annual financial report" in text
+        or "half-year report" in text
+        or "half year report" in text
+        or "halvarsrapport" in text
+        or re.search(r"\bhalvar\b", text)
+    ):
+        return "half_year_financial_report"
+
+    if (
+        "rapport financier annuel" in text
+        or "informe financiero anual" in text
+        or "annual financial report" in text
+        or "annual report" in text
+        or "annual accounts" in text
+        or (
+            "financial statements" in text
+            and "year end" in text
+        )
+        or "jaarverslag" in text
+        or re.search(r"\barsrapport\b", text)
+        or re.search(r"\barsmelding\b", text)
+    ):
+        return "annual_financial_report"
+
+    if (
+        "quarterly financial report" in text
+        or "consolidated quarterly financial report" in text
+        or "quarterly report" in text
         or "quarterly period" in text
         or "tertialrapport" in text
         or re.search(r"\btertial\b", text)

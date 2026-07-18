@@ -4,8 +4,10 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from config import Settings
 from connectors.base import ConnectorState
 from connectors.poland_knf_oam import (
+    PolandListingPage,
     PolandKnfOamConnector,
     classify_poland_document,
     classify_poland_notice,
@@ -185,3 +187,38 @@ def test_source_first_filters_before_detail_and_materializes_periodic() -> None:
     diagnostic = connector.diagnose()
     assert diagnostic.state == ConnectorState.READY
     assert diagnostic.http_calls == 3
+
+
+def test_default_pagination_limit_accepts_eighteen_page_day(monkeypatch) -> None:
+    monkeypatch.delenv("POLAND_KNF_OAM_MAX_PAGES_PER_DATE", raising=False)
+    settings = Settings.from_env()
+    connector = PolandKnfOamConnector(
+        session=FakeSession(),  # type: ignore[arg-type]
+        rate_limit_seconds=0,
+    )
+    page_urls = tuple(f"https://knf.test/page-{page}" for page in range(2, 19))
+    calls: list[str] = []
+
+    def listing_page(url: str, *, name: str) -> PolandListingPage:
+        calls.append(url)
+        if len(calls) == 1:
+            return PolandListingPage(
+                notices=(),
+                total_count=360,
+                pagination_urls=page_urls,
+            )
+        return PolandListingPage(notices=(), total_count=360, pagination_urls=())
+
+    monkeypatch.setattr(connector, "_listing_page", listing_page)
+
+    notices = connector._all_pages(
+        "https://knf.test/page-1",
+        name="KNF high-volume day",
+        max_pages=connector.max_pages_per_date,
+        require_complete=True,
+    )
+
+    assert settings.poland_knf_oam_max_pages_per_date == 25
+    assert connector.max_pages_per_date == 25
+    assert notices == []
+    assert calls == ["https://knf.test/page-1", *page_urls]

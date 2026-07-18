@@ -29,8 +29,9 @@ def test_build_romania_download_url_normalizes_participants_href() -> None:
     assert (
         url
         == "https://oam.asfromania.ro/oam/DownloadPDFFile.do?"
-        "nume_raportare=T`2025`07`SNP`RFT_SNP_25_10_20251029_080100.pdf"
+        "nume_raportare=T%602025%6007%60SNP%60RFT_SNP_25_10_20251029_080100.pdf"
     )
+    assert "`" not in url
 
 
 def test_build_romania_listing_url() -> None:
@@ -80,10 +81,21 @@ class _FilteredListingSession:
             (f"annual-{index}", "Raport Financiar Anual", "anuala", "2026-04-30")
             for index in range(1, 12)
         ]
+        annual_rows.extend(
+            (
+                ("calendar-1", "CALENDAR", "anuala", "2026-06-24"),
+                (
+                    "board-1",
+                    "RAN502 - Raport consiliul de administratie (neconsolidat)",
+                    "anuala",
+                    "2026-07-10",
+                ),
+            )
+        )
         self.pages = {
             "16": (
-                _listing_html(annual_rows[:10], total=11),
-                _listing_html(annual_rows[10:], total=11),
+                _listing_html(annual_rows[:10], total=13),
+                _listing_html(annual_rows[10:], total=13),
             ),
             "15": (
                 _listing_html(
@@ -151,6 +163,10 @@ def test_filtered_search_covers_all_periodic_types_and_real_pagination() -> None
         for url in session.get_urls
     )
     assert len(candidates) == 13
+    assert not any(
+        candidate.title == "CALENDAR" or "Raport consiliul" in candidate.title
+        for candidate in candidates
+    )
     assert {candidate.document_type for candidate in candidates} == {
         "annual_financial_report",
         "half_year_financial_report",
@@ -189,7 +205,7 @@ def test_listing_parsing_finds_petrom_quarterly_report() -> None:
     assert quarterly.published_at == date(2025, 10, 29)
     assert quarterly.files[0].download_url.endswith(
         "oam/DownloadPDFFile.do?nume_raportare="
-        "T`2025`07`SNP`RFT_SNP_25_10_20251029_080100.pdf"
+        "T%602025%6007%60SNP%60RFT_SNP_25_10_20251029_080100.pdf"
     )
 
 
@@ -225,6 +241,34 @@ def test_periodic_classification(
     expected: str,
 ) -> None:
     assert classify_romania_document(title, period_type)[0] == expected
+
+
+@pytest.mark.parametrize(
+    ("title", "filename"),
+    [
+        ("CALENDAR", "CALENDAR01_BCROBL_26_06_20260624_120329.pdf"),
+        (
+            "RAN501 - Raport consiliul de administratie",
+            "RAN501_FP_26_06_20260602_185616.pdf",
+        ),
+        (
+            "RAN502 - Raport consiliul de administratie (neconsolidat)",
+            "RAN502_ETFBRK_26_07_20260710_111011.pdf",
+        ),
+    ],
+)
+def test_annual_source_bucket_does_not_override_non_financial_title(
+    title: str,
+    filename: str,
+) -> None:
+    classification, _, _, negative = classify_romania_document(
+        title,
+        "anuala",
+        filename,
+    )
+
+    assert classification == "other_regulatory_announcement"
+    assert negative
 
 
 @pytest.mark.parametrize(

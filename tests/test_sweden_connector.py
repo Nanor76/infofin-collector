@@ -174,6 +174,16 @@ def test_sweden_document_classification() -> None:
     assert cls == "annual_financial_report"
     assert not neg
 
+    # Un titre semestriel explicite prime sur une catégorie source annuelle
+    # erronée et sur le marqueur calendaire Q2.
+    cls, reason, pos, neg = classify_sweden_document(
+        title="Halvårsrapport (Q2)",
+        category="Annual financial report",
+        url="https://finanscentralen.fi.se/search/GetFile.aspx?fid=63222",
+    )
+    assert cls == "half_year_financial_report"
+    assert not neg
+
     # “Årsredovisning” doit être accepté.
     cls, reason, pos, neg = classify_sweden_document(
         title="Årsredovisning 2025",
@@ -242,5 +252,4 @@ def test_sweden_date_handling() -> None:
     assert info_h1["published_at"] == date(2026, 8, 20)
     assert info_h1["period_end_date"] == date(2026, 6, 30)
     assert info_h1["reporting_year"] == 2026
-
 

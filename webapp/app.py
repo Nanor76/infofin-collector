@@ -1,24 +1,32 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import re
+import secrets
 import tempfile
 import unicodedata
-from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import Settings
 from connectors import SUPPORTED_WATCH_MARKETS
 from db import Database
-from webapp.jobs import JobManager
+from webapp.cloud_jobs import CloudRunJobLauncher, CloudTasksJobLauncher
+from webapp.firestore_repository import (
+    FirestoreWebSearchRepository,
+    GoogleFirestoreDocumentStore,
+)
+from webapp.jobs import CloudJobManager, JobManager, run_stored_search
 from webapp.repositories import WebSearchRepository
 from webapp.schemas import (
     SearchCreateRequest,
     SearchCreateResponse,
+    InternalSearchRunRequest,
     SearchResultsResponse,
     SearchStatusResponse,
 )
@@ -71,6 +79,9 @@ def _request_from_schema(
 def _public_search_status(status: dict[str, object]) -> dict[str, object]:
     raw_warnings = list(status.get("warnings") or [])
     raw_errors = list(status.get("errors") or [])
+    public_status = str(status.get("status") or "")
+    if public_status == "queued":
+        public_status = "running"
     public_markets = []
     for run in list(status.get("markets") or []):
         public_markets.append(
@@ -92,7 +103,7 @@ def _public_search_status(status: dict[str, object]) -> dict[str, object]:
         )
     return {
         "job_id": str(status.get("job_id") or ""),
-        "status": str(status.get("status") or ""),
+        "status": public_status,
         "results_count": int(status.get("results_count") or 0),
         "warnings": (
             ["Certains résultats peuvent être incomplets."]
@@ -128,18 +139,82 @@ def create_app(
     *,
     settings: Settings | None = None,
     database: Database | None = None,
-    job_manager: JobManager | None = None,
+    repository=None,
+    job_manager=None,
+    search_service=None,
 ) -> FastAPI:
     resolved_settings = settings or Settings.from_env()
-    resolved_database = database or Database(resolved_settings.db_path)
-    resolved_database.initialize_web_search_schema()
-    repository = WebSearchRepository(resolved_database)
-    search_service = DocumentSearchService(resolved_settings)
-    resolved_job_manager = job_manager or JobManager(
-        repository=repository,
-        search_service=search_service,
-        max_workers=resolved_settings.web_workers,
+    if resolved_settings.web_storage_backend not in {"sqlite", "firestore"}:
+        raise ValueError("INFOFIN_WEB_STORAGE_BACKEND doit valoir sqlite ou firestore")
+    if resolved_settings.web_job_backend not in {
+        "local",
+        "cloud-run",
+        "cloud-tasks",
+    }:
+        raise ValueError(
+            "INFOFIN_WEB_JOB_BACKEND doit valoir local, cloud-run ou cloud-tasks"
+        )
+    if (
+        resolved_settings.web_job_backend in {"cloud-run", "cloud-tasks"}
+        and resolved_settings.web_storage_backend != "firestore"
+    ):
+        raise ValueError("Les backends cloud nécessitent le stockage firestore")
+
+    resolved_database = database
+    resolved_repository = repository
+    if resolved_repository is None:
+        if resolved_settings.web_storage_backend == "firestore":
+            if not resolved_settings.google_cloud_project:
+                raise ValueError("GOOGLE_CLOUD_PROJECT est requis avec Firestore")
+            resolved_repository = FirestoreWebSearchRepository(
+                store=GoogleFirestoreDocumentStore(
+                    project=resolved_settings.google_cloud_project,
+                ),
+                prefix=resolved_settings.firestore_collection_prefix,
+            )
+        else:
+            resolved_database = resolved_database or Database(resolved_settings.db_path)
+            resolved_database.initialize_web_search_schema()
+            resolved_repository = WebSearchRepository(resolved_database)
+
+    resolved_search_service = search_service or DocumentSearchService(
+        resolved_settings
     )
+    resolved_job_manager = job_manager
+    if resolved_job_manager is None:
+        if resolved_settings.web_job_backend == "cloud-run":
+            if not resolved_settings.cloud_run_search_job:
+                raise ValueError("INFOFIN_CLOUD_RUN_JOB est requis")
+            resolved_job_manager = CloudJobManager(
+                repository=resolved_repository,
+                launcher=CloudRunJobLauncher(
+                    project=resolved_settings.google_cloud_project,
+                    region=resolved_settings.google_cloud_region,
+                    job_name=resolved_settings.cloud_run_search_job,
+                ),
+            )
+        elif resolved_settings.web_job_backend == "cloud-tasks":
+            if not resolved_settings.cloud_tasks_queue:
+                raise ValueError("INFOFIN_CLOUD_TASKS_QUEUE est requis")
+            if not resolved_settings.web_service_url:
+                raise ValueError("INFOFIN_WEB_SERVICE_URL est requis")
+            resolved_job_manager = CloudJobManager(
+                repository=resolved_repository,
+                launcher=CloudTasksJobLauncher(
+                    project=resolved_settings.google_cloud_project,
+                    region=resolved_settings.google_cloud_region,
+                    queue_name=resolved_settings.cloud_tasks_queue,
+                    service_url=resolved_settings.web_service_url,
+                    username=resolved_settings.web_access_username,
+                    password=resolved_settings.web_access_password,
+                ),
+            )
+        else:
+            resolved_job_manager = JobManager(
+                repository=resolved_repository,
+                search_service=resolved_search_service,
+                max_workers=resolved_settings.web_workers,
+            )
 
     app = FastAPI(
         title="InfoFin Document Search",
@@ -147,6 +222,47 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
     )
+
+    @app.middleware("http")
+    async def require_basic_auth(request: Request, call_next):
+        expected_password = resolved_settings.web_access_password
+        if not expected_password:
+            return await call_next(request)
+
+        authorization = request.headers.get("authorization", "")
+        scheme, _, encoded_credentials = authorization.partition(" ")
+        try:
+            decoded_credentials = base64.b64decode(
+                encoded_credentials,
+                validate=True,
+            ).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            decoded_credentials = ""
+        username, separator, password = decoded_credentials.partition(":")
+        username_matches = secrets.compare_digest(
+            username.encode("utf-8"),
+            resolved_settings.web_access_username.encode("utf-8"),
+        )
+        password_matches = secrets.compare_digest(
+            password.encode("utf-8"),
+            expected_password.encode("utf-8"),
+        )
+        if (
+            scheme.casefold() != "basic"
+            or not separator
+            or not username_matches
+            or not password_matches
+        ):
+            return PlainTextResponse(
+                "Authentification requise.",
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": 'Basic realm="InfoFin", charset="UTF-8"',
+                    "Cache-Control": "no-store",
+                },
+            )
+        return await call_next(request)
+
     app.mount(
         "/static",
         StaticFiles(directory=str(_WEBAPP_DIR / "static")),
@@ -154,12 +270,33 @@ def create_app(
     )
     app.state.settings = resolved_settings
     app.state.database = resolved_database
-    app.state.repository = repository
+    app.state.repository = resolved_repository
     app.state.job_manager = resolved_job_manager
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "storage_backend": resolved_settings.web_storage_backend,
+            "job_backend": resolved_settings.web_job_backend,
+        }
+
+    @app.post("/internal/search-worker", status_code=204)
+    def run_internal_search(payload: InternalSearchRunRequest) -> Response:
+        if resolved_settings.web_job_backend != "cloud-tasks":
+            raise HTTPException(status_code=404, detail="Route inconnue")
+        job = resolved_repository.get_job(payload.job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job inconnu")
+        if job["status"] != "queued":
+            return Response(status_code=204)
+        run_stored_search(
+            repository=resolved_repository,
+            search_service=resolved_search_service,
+            job_id=payload.job_id,
+            request=job["request"],
+        )
+        return Response(status_code=204)
 
     @app.get("/api/markets")
     def list_markets() -> dict[str, list[str]]:
@@ -213,7 +350,7 @@ def create_app(
     ) -> SearchResultsResponse:
         if resolved_job_manager.get_status(job_id) is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
-        results, total = repository.list_results(
+        results, total = resolved_repository.list_results(
             job_id,
             document_type=document_type,
             market=market,
@@ -245,7 +382,7 @@ def create_app(
         results: list[dict[str, object]] = []
         page = 1
         while True:
-            batch, total = repository.list_results(
+            batch, total = resolved_repository.list_results(
                 job_id,
                 document_type=document_type,
                 market=market,
@@ -354,7 +491,9 @@ def create_app(
             "show_initial_results": False,
         }
         if status["status"] in {"done", "partial", "failed"}:
-            results, total = repository.list_results(job_id, page=1, page_size=50)
+            results, total = resolved_repository.list_results(
+                job_id, page=1, page_size=50
+            )
             page_size = 50
             context.update(
                 {
@@ -400,18 +539,26 @@ def create_app(
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=50, ge=1, le=200),
     ) -> HTMLResponse:
-        if resolved_job_manager.get_status(job_id) is None:
+        status = resolved_job_manager.get_status(job_id)
+        if status is None:
             raise HTTPException(status_code=404, detail="Job inconnu")
-        results, total = repository.list_results(
-            job_id,
-            document_type=document_type,
-            market=market,
-            q=q,
-            issuer_isin=issuer_isin,
-            sort=sort,
-            page=page,
-            page_size=page_size,
-        )
+        if (
+            resolved_settings.web_job_backend in {"cloud-run", "cloud-tasks"}
+            and status["status"] in {"queued", "running"}
+        ):
+            # Avoid rereading every Firestore result during two-second polling.
+            results, total = [], 0
+        else:
+            results, total = resolved_repository.list_results(
+                job_id,
+                document_type=document_type,
+                market=market,
+                q=q,
+                issuer_isin=issuer_isin,
+                sort=sort,
+                page=page,
+                page_size=page_size,
+            )
         total_pages = max(1, (total + page_size - 1) // page_size)
         return _TEMPLATES.TemplateResponse(
             request,

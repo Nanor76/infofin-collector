@@ -12,7 +12,7 @@ from pathlib import Path
 
 from classification import classify_document
 from config import Settings
-from connectors import connector_for_market
+from connectors import SUPPORTED_WATCH_MARKETS, connector_for_market
 from connectors.base import DocumentCandidate
 from http_client import build_http_session
 from load_watchlist import normalize_market
@@ -39,6 +39,14 @@ NEGATIVE_TERMS = (
     "ucits",
     "kid",
     "priips",
+    "announces the date of publication",
+    "date of publication of the financial report",
+    "financial calendar",
+    "rapport consiliul de administratie",
+    "ran501",
+    "ran502",
+    "oppdatering volum",
+    "volume update",
 )
 
 PERIODIC_TYPES = frozenset(
@@ -82,6 +90,8 @@ REMAINING_BATCH = (
     "Nordic Growth Market",
 )
 
+ALL_MARKETS = SUPPORTED_WATCH_MARKETS
+
 
 def _normalize(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text or "")
@@ -122,7 +132,6 @@ def _category_from_candidate(candidate: DocumentCandidate) -> str:
         str(metadata.get("reporting_topic") or ""),
         str(metadata.get("document_type_en") or ""),
         str(metadata.get("document_type_label") or ""),
-        candidate.classification or "",
     ]
     return " ".join(part for part in parts if part).strip()
 
@@ -136,6 +145,11 @@ def _guess_from_title(
     haystack = _normalize(f"{title} {category}")
     for term in NEGATIVE_TERMS:
         normalized_term = _normalize(term)
+        if (
+            normalized_term == "general meeting"
+            and "annual report" in haystack
+        ):
+            continue
         if len(normalized_term) <= 3:
             if re.search(rf"\b{re.escape(normalized_term)}\b", haystack):
                 return "other_regulatory_announcement", f"negative:{term}"
@@ -163,12 +177,27 @@ def _guess_from_title(
             "",
         )
         return guess, reason
+    elif market_key == "nasdaq copenhagen":
+        from connectors.denmark_dfsa_oam import classify_denmark_document
+
+        guess, reason, _, _ = classify_denmark_document(
+            title,
+            category,
+            "",
+        )
+        return guess, reason
     elif market_key == "euronext dublin":
         from connectors.ireland_euronext_direct import _financial_type
 
         guess = _financial_type(category, title, "")
         if guess:
             return guess, guess
+    elif market_key == "oslo børs":
+        from connectors.oslo_newsweb import _attachment_type
+
+        guess = _attachment_type(title, category, "")
+        if guess:
+            return guess, title
 
     title_only = classify_document(title, "")
     if title_only and title_only != "esef":
@@ -300,6 +329,12 @@ def audit_market(
 
     title_signals = sum(1 for row in rows if row.title_guess)
     conflicts = sum(1 for row in rows if row.status == "CONFLICT")
+    no_title_signal = sum(
+        1
+        for row in rows
+        if row.status == "NO_TITLE_SIGNAL"
+        and row.document_type != "other_regulatory_announcement"
+    )
     summary = {
         "market": normalized,
         "status": "error" if error else "ok",
@@ -307,6 +342,7 @@ def audit_market(
         "candidates": len(rows),
         "title_signals": title_signals,
         "conflicts": conflicts,
+        "no_title_signal": no_title_signal,
         "error": error,
     }
     payload = {
@@ -370,7 +406,7 @@ def main(argv: list[str] | None = None) -> int:
         markets = REMAINING_BATCH
         batch_name = "remaining"
     else:
-        markets = OTHER_BATCH + REMAINING_BATCH
+        markets = ALL_MARKETS
         batch_name = "all"
 
     settings = Settings.from_env()

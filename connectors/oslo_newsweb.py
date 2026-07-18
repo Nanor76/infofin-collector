@@ -84,12 +84,70 @@ def _clean_company_name(value: str) -> str:
     return " ".join(parts)
 
 
+def _is_non_report_title(normalized_title: str) -> bool:
+    if any(
+        marker in normalized_title
+        for marker in (
+            "oppdatering volum",
+            "volumoppdatering",
+            "volume update",
+        )
+    ):
+        return True
+    meeting_only = re.search(
+        r"\bannual(?: and special)? (?:general )?meeting\b",
+        normalized_title,
+    )
+    has_annual_document = any(
+        marker in normalized_title
+        for marker in (
+            "annual report",
+            "annual financial",
+            "annual accounts",
+            "financial statements",
+        )
+    )
+    return bool(meeting_only and not has_annual_document)
+
+
 def _attachment_type(title: str, topic: str, url: str) -> str | None:
     normalized_title = normalize_text(title)
     normalized_topic = normalize_text(topic)
     extension = PurePosixPath(urlparse(url).path).suffix.casefold()
     combined = f"{normalized_title} {normalized_topic}"
 
+    if _is_non_report_title(normalized_title):
+        return None
+
+    if (
+        "half year" in normalized_title
+        or "half-year" in normalized_title
+        or "halvarsrapport" in normalized_title
+        or re.search(r"\b1\.?\s*halvar\b", normalized_title)
+        or (
+            "delarsrapport" in normalized_title
+            and re.search(
+                r"\b(?:januari|january)\s*[-–]\s*(?:juni|june)\b",
+                normalized_title,
+            )
+        )
+    ):
+        return "half_year_financial_report"
+
+    norwegian_quarter = re.search(
+        r"\b(?:[1-4]\.?|forste|andre|tredje|fjerde)\s*kvartal\b",
+        normalized_title,
+    )
+    has_report_context = any(
+        marker in normalized_title
+        for marker in (
+            "rapport",
+            "regnskap",
+            "resultat",
+            "financial",
+            "statements",
+        )
+    )
     if (
         "quarterly report" in normalized_title
         or "quarterly period" in normalized_title
@@ -102,14 +160,15 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
             r"\b(?:first|second|third|fourth) quarter\b",
             normalized_title,
         )
+        or (norwegian_quarter and has_report_context)
     ):
         return "quarterly_financial_report"
     if (
         "half year" in normalized_title
         or "half-year" in normalized_title
         or "halvarsrapport" in normalized_title
-        or normalized_topic
-        == normalize_text(OSLO_SOURCE_TOPICS[1])
+        or normalized_topic == normalize_text(OSLO_SOURCE_TOPICS[1])
+        or "halvarsrapport" in normalized_topic
     ):
         return "half_year_financial_report"
     if (
@@ -119,8 +178,8 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
         or "arsberetning" in normalized_title
         or "arsregnskap" in normalized_title
         or "arsmelding" in normalized_title
-        or normalized_topic
-        == normalize_text(OSLO_SOURCE_TOPICS[0])
+        or normalized_topic == normalize_text(OSLO_SOURCE_TOPICS[0])
+        or "arsrapport" in normalized_topic
     ):
         return "annual_financial_report"
     if "financial report" in combined:
@@ -131,6 +190,9 @@ def _attachment_type(title: str, topic: str, url: str) -> str | None:
 
 
 def _is_financial_notice(title: str, topic: str) -> bool:
+    normalized_title = normalize_text(title)
+    if _is_non_report_title(normalized_title):
+        return False
     normalized_topic = normalize_text(topic)
     if normalized_topic in {
         normalize_text(value) for value in OSLO_SOURCE_TOPICS
@@ -139,7 +201,6 @@ def _is_financial_notice(title: str, topic: str) -> bool:
         for token in ("arsrapport", "halvarsrapport")
     ):
         return True
-    normalized_title = normalize_text(title)
     return any(
         normalize_text(term) in normalized_title
         for term in OSLO_TITLE_TERMS
