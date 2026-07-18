@@ -517,6 +517,7 @@ def test_google_cloud_deployment_assets_keep_free_tier_guards() -> None:
     assert "INFOFIN_BETA_DAILY_SEARCH_LIMIT=" in script
     assert "--update-secrets=" in script
     assert "--remove-secrets=INFOFIN_WEB_ACCESS_PASSWORD" in script
+    assert "URL publique protégée par les comptes individuels de la bêta" in script
     assert "--edition=standard" not in script
     assert "'--args=-m,webapp.run_job'" in script
     assert "'--args=-m,webapp.purge_firestore'" in script

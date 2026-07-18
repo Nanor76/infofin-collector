@@ -309,7 +309,10 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "InfoFin est déployé : $ServiceUrl"
 if ($Public) {
-    if ($AccessPasswordSecret) {
+    if ($BetaUsersSecret) {
+        Write-Host "URL publique protégée par les comptes individuels de la bêta."
+    }
+    elseif ($AccessPasswordSecret) {
         Write-Host "URL publique protégée par l'utilisateur '$AccessUsername'."
     }
     else {
