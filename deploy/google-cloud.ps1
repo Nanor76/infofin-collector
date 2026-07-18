@@ -246,7 +246,7 @@ if ($AccessPasswordSecret) {
 if ($BetaUsersSecret) {
     $WebEnvironment += ",INFOFIN_BETA_DAILY_SEARCH_LIMIT=$BetaDailySearchLimit,INFOFIN_CONTACT_EMAIL=$ContactEmail,INFOFIN_LEGAL_PUBLISHER=$LegalPublisher"
     $WebDeployArguments += (
-        "--set-secrets=" +
+        "--update-secrets=" +
         "INFOFIN_BETA_USERS_JSON=${BetaUsersSecret}:latest," +
         "INFOFIN_BETA_SESSION_SECRET=${BetaSessionSecret}:latest," +
         "INFOFIN_WORKER_TOKEN=${WorkerTokenSecret}:latest"
