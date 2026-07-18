@@ -97,6 +97,7 @@ def _beta_client(tmp_path: Path, *, limit: int = 3) -> TestClient:
         web_worker_token="w" * 32,
         web_contact_email="beta@example.test",
         web_legal_publisher="InfoFin Test",
+        web_service_url="https://infofin.example.run.app",
     )
     database = Database(settings.db_path)
     database.initialize_web_search_schema()
@@ -107,10 +108,10 @@ def _beta_client(tmp_path: Path, *, limit: int = 3) -> TestClient:
         repository=repository,
         job_manager=BetaJobManager(repository),
     )
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
-def _login(client: TestClient, username: str = "alice") -> None:
+def _login(client: TestClient, username: str = "alice"):
     response = client.post(
         "/login",
         data={
@@ -121,6 +122,7 @@ def _login(client: TestClient, username: str = "alice") -> None:
         follow_redirects=False,
     )
     assert response.status_code == 303
+    return response
 
 
 def test_beta_passwords_are_hashed_and_verified() -> None:
@@ -186,7 +188,11 @@ def test_beta_login_protects_the_app_but_keeps_legal_pages_public(
     assert invalid.status_code == 303
     assert "error=1" in invalid.headers["location"]
 
-    _login(client)
+    logged_in = _login(client)
+    session_cookie = logged_in.headers["set-cookie"]
+    assert "HttpOnly" in session_cookie
+    assert "Secure" in session_cookie
+    assert "SameSite=lax" in session_cookie
     home = client.get("/")
     assert home.status_code == 200
     assert 'data-testid="layout-beta-user">Alice<' in home.text

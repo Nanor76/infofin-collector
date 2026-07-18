@@ -401,7 +401,10 @@ def create_app(
             beta_authenticator.create_session(user),
             max_age=beta_authenticator.session_seconds,
             httponly=True,
-            secure=request.url.scheme == "https",
+            secure=(
+                request.url.scheme == "https"
+                or resolved_settings.web_service_url.startswith("https://")
+            ),
             samesite="lax",
             path="/",
         )
