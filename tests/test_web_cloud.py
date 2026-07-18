@@ -69,10 +69,10 @@ def test_cloud_settings_are_loaded_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("INFOFIN_FIRESTORE_PREFIX", "test_infofin")
     monkeypatch.setenv("INFOFIN_WEB_ACCESS_USERNAME", "mobile-user")
     monkeypatch.setenv("INFOFIN_WEB_ACCESS_PASSWORD", "secret-value")
-    monkeypatch.setenv("INFOFIN_BETA_USERS_JSON", '{"alice":"hash"}')
-    monkeypatch.setenv("INFOFIN_BETA_SESSION_SECRET", "session-secret")
+    monkeypatch.setenv("INFOFIN_BETA_USERS_JSON", '{"alice":"hash"}\r\n')
+    monkeypatch.setenv("INFOFIN_BETA_SESSION_SECRET", "session-secret\r\n")
     monkeypatch.setenv("INFOFIN_BETA_DAILY_SEARCH_LIMIT", "5")
-    monkeypatch.setenv("INFOFIN_WORKER_TOKEN", "worker-secret")
+    monkeypatch.setenv("INFOFIN_WORKER_TOKEN", "worker-secret\r\n")
     monkeypatch.setenv("INFOFIN_CONTACT_EMAIL", "beta@example.test")
     monkeypatch.setenv("INFOFIN_LEGAL_PUBLISHER", "InfoFin Test")
 
